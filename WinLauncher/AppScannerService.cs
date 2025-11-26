@@ -19,10 +19,19 @@ namespace WinLauncher
         private readonly IconExtractorService _iconExtractor;
         private readonly PerformanceMonitor _performanceMonitor;
 
-        public WindowsAppScannerService(IconExtractorService iconExtractor)
+        private readonly List<IScanStrategy> _scanStrategies;
+
+        public WindowsAppScannerService(IconExtractorService iconExtractor,
+        PerformanceMonitor performanceMonitor)
         {
             _iconExtractor = iconExtractor;
-            _performanceMonitor = new PerformanceMonitor();
+            _performanceMonitor = performanceMonitor;
+            _scanStrategies = new List<IScanStrategy>
+            {
+                new DesktopScanStrategy(iconExtractor),
+                new UwpScanStrategy(iconExtractor),
+                new StoreAppScanStrategy(iconExtractor),
+            };
         }
 
         /// <summary>
@@ -34,14 +43,8 @@ namespace WinLauncher
 
             try
             {
-                var tasks = new[]
-                {
-                    Task.Run(() => new DesktopScanStrategy(_iconExtractor).ScanAsync()),
-                    Task.Run(() => new UwpScanStrategy(_iconExtractor).ScanAsync()),
-                    Task.Run(() =>  new StoreAppScanStrategy(_iconExtractor).ScanAsync())
-                };
-
-                var results = await Task.WhenAll(tasks);
+                var scanTasks = _scanStrategies.Select(strategy => strategy.ScanAsync()).ToArray();
+                var results = await Task.WhenAll(scanTasks);
                 var allApps = results.SelectMany(x => x).ToList();
 
                 var distinctApps = allApps.Distinct(new AppInfoComparer()).ToList();
