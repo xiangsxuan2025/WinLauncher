@@ -120,12 +120,13 @@ namespace WinLauncher
         {
             try
             {
-                // 显示加载状态
                 IsLoading = true;
 
-                // 先显示加载状态 - 使用新的创建方法
+                // 先显示加载状态
                 Items.Clear();
                 Items.Add(LaunchpadItem.CreateMessageItem("正在扫描应用..."));
+
+                System.Diagnostics.Debug.WriteLine("=== 开始扫描所有应用 ===");
 
                 var apps = await _appScanner.ScanInstalledAppsAsync();
 
@@ -134,7 +135,16 @@ namespace WinLauncher
 
                 if (apps.Any())
                 {
-                    System.Diagnostics.Debug.WriteLine($"成功扫描到 {apps.Count} 个应用");
+                    System.Diagnostics.Debug.WriteLine($"=== 扫描完成，共找到 {apps.Count} 个应用 ===");
+
+                    // 统计不同类型应用的数量
+                    var traditionalApps = apps.Count(a => !a.Id.StartsWith("UWP_") && !a.Id.StartsWith("Store_"));
+                    var uwpApps = apps.Count(a => a.Id.StartsWith("UWP_"));
+                    var storeApps = apps.Count(a => a.Id.StartsWith("Store_"));
+
+                    System.Diagnostics.Debug.WriteLine($"传统桌面应用: {traditionalApps} 个");
+                    System.Diagnostics.Debug.WriteLine($"UWP 应用: {uwpApps} 个");
+                    System.Diagnostics.Debug.WriteLine($"应用商店应用: {storeApps} 个");
 
                     // 将应用转换为 LaunchpadItem
                     foreach (var app in apps)
@@ -143,12 +153,14 @@ namespace WinLauncher
                         Items.Add(item);
 
                         // 调试信息
-                        System.Diagnostics.Debug.WriteLine($"添加应用: {app.DisplayName}, 图标: {(app.Icon != null ? "已加载" : "未加载")}");
+                        var appType = app.Id.StartsWith("UWP_") ? "UWP" :
+                                     app.Id.StartsWith("Store_") ? "Store" : "Desktop";
+                        System.Diagnostics.Debug.WriteLine($"{appType}应用: {app.DisplayName}, 路径: {app.ExecutablePath}");
                     }
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine("没有扫描到任何应用");
+                    System.Diagnostics.Debug.WriteLine("=== 扫描完成，未找到任何应用 ===");
                     Items.Add(LaunchpadItem.CreateMessageItem("未找到应用"));
                 }
 
@@ -158,7 +170,6 @@ namespace WinLauncher
                     var (savedItems, savedFolders) = await _dataService.LoadLayoutAsync();
                     if (savedItems.Count > 0)
                     {
-                        // 合并保存的布局和扫描到的应用
                         MergeLayoutWithScannedApps(savedItems, apps);
                     }
 
