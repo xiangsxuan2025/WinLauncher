@@ -1,4 +1,4 @@
-using WinLauncher.Models;
+using WinLauncher.Core.Models;
 
 /// <summary>
 /// 应用信息比较器，用于去重操作

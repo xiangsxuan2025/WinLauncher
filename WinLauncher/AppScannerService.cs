@@ -3,7 +3,7 @@ using System.Linq;
 using System.Security;
 using System.Windows;
 using System.Windows.Media.Imaging;
-using WinLauncher.Models;
+using WinLauncher.Core.Models;
 
 namespace WinLauncher
 {
