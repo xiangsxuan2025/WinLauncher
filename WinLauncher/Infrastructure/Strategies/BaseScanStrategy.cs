@@ -9,11 +9,11 @@ namespace WinLauncher.Infrastructure.Strategies
     {
         public abstract string StrategyName { get; }
 
-        protected readonly IconExtractorService IconExtractor;
+        private IconExtractorService _iconExtractor;
 
-        protected BaseScanStrategy(IconExtractorService iconExtractor)
+        public BaseScanStrategy(IconExtractorService iconExtractor)
         {
-            IconExtractor = iconExtractor;
+            this._iconExtractor = iconExtractor;
         }
 
         public abstract Task<List<AppInfo>> ScanAsync();

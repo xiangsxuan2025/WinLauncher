@@ -13,9 +13,6 @@ namespace WinLauncher.Core.Interfaces
         /// </summary>
         Task<List<AppInfo>> ScanInstalledAppsAsync();
 
-        // 新增：专门扫描 UWP 和应用商店应用
-        Task<List<AppInfo>> ScanUwpAppsAsync();
-
         Task<List<AppInfo>> ScanStoreAppsAsync();
     }
 }
