@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Media.Imaging;
 using WinLauncher.Core.Interfaces;
 using WinLauncher.Core.Models;
+using WinLauncher.Infrastructure.Helpers;
 
 namespace WinLauncher
 {
@@ -215,7 +216,7 @@ namespace WinLauncher
 
                 // 获取所有 .exe 文件，并过滤掉系统文件和安装程序
                 var exeFiles = Directory.GetFiles(appDir, "*.exe", searchOptions)
-                    .Where(f => !IsSystemOrInstallerFile(f));
+                    .Where(f => !FileFilter.IsSystemOrInstallerFile(f));
 
                 foreach (var exeFile in exeFiles)
                 {
@@ -235,25 +236,6 @@ namespace WinLauncher
             {
                 System.Diagnostics.Debug.WriteLine($"扫描应用程序目录 {appDir} 时出错: {ex.Message}");
             }
-        }
-
-        /// <summary>
-        /// 判断文件是否为系统文件或安装程序
-        /// 用于过滤掉不需要显示的可执行文件
-        /// </summary>
-        private bool IsSystemOrInstallerFile(string filePath)
-        {
-            var fileName = Path.GetFileName(filePath).ToLowerInvariant();
-
-            // 排除安装程序、卸载程序、系统文件等
-            var excludedKeywords = new[]
-            {
-                "uninstall", "install", "setup", "update", "patch",
-                "helper", "service", "runtime", "launcher", "crash",
-                "debug", "diagnostics", "repair", "unins"
-            };
-
-            return excludedKeywords.Any(keyword => fileName.Contains(keyword));
         }
 
         /// <summary>
@@ -362,7 +344,7 @@ namespace WinLauncher
                 {
                     // 否则在安装目录中查找主要的可执行文件
                     var exeFiles = Directory.GetFiles(installLocation, "*.exe")
-                        .Where(f => !IsSystemOrInstallerFile(f))
+                        .Where(f => !FileFilter.IsSystemOrInstallerFile(f))
                         .OrderBy(f => f.Length) // 通常主程序文件较小
                         .FirstOrDefault();
 
@@ -398,7 +380,7 @@ namespace WinLauncher
         {
             try
             {
-                var targetPath = await ResolveShortcutTarget(lnkPath);
+                var targetPath = await ShortcutResolver.ResolveShortcutTarget(lnkPath);
 
                 if (!string.IsNullOrEmpty(targetPath) && File.Exists(targetPath))
                 {
@@ -430,47 +412,6 @@ namespace WinLauncher
         {
             return await _iconExtractor.GetAppIconAsync(executablePath);
         }
-
-        /// <summary>
-        /// 解析快捷方式文件的目标路径
-        /// 使用多种方法确保兼容性
-        /// </summary>
-        private async Task<string> ResolveShortcutTarget(string lnkPath)
-        {
-            try
-            {
-                // 方法1: 尝试从 .lnk 文件所在目录查找同名的 .exe 文件
-                var directory = Path.GetDirectoryName(lnkPath);
-                var fileName = Path.GetFileNameWithoutExtension(lnkPath);
-                var possibleExePath = Path.Combine(directory, fileName + ".exe");
-
-                if (File.Exists(possibleExePath))
-                    return possibleExePath;
-
-                // 方法2: 使用 Windows Script Host (COM)
-                try
-                {
-                    var shellType = Type.GetTypeFromProgID("WScript.Shell");
-                    dynamic shell = Activator.CreateInstance(shellType);
-                    dynamic shortcut = shell.CreateShortcut(lnkPath);
-                    string targetPath = shortcut.TargetPath;
-
-                    if (!string.IsNullOrEmpty(targetPath) && File.Exists(targetPath))
-                        return targetPath;
-                }
-                catch
-                {
-                    // 如果 COM 方法失败，回退到其他方法
-                }
-
-                return lnkPath; // 如果所有方法都失败，返回原始路径
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"解析快捷方式目标失败 {lnkPath}: {ex.Message}");
-                return lnkPath;
-            }
-        }// 在 WindowsAppScannerService 类中添加更好的图标处理
 
         private async Task<AppInfo> CreateAppInfoFromExecutable(string exePath)
         {
@@ -1081,7 +1022,7 @@ namespace WinLauncher
 
                 // 查找应用可执行文件
                 var exeFiles = Directory.GetFiles(appDirectory, "*.exe", SearchOption.AllDirectories)
-                    .Where(f => !IsSystemOrInstallerFile(f))
+                    .Where(f => !FileFilter.IsSystemOrInstallerFile(f))
                     .ToList();
 
                 if (exeFiles.Count == 0)
