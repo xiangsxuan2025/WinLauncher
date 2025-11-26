@@ -2,6 +2,8 @@ using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows.Media.Imaging;
+using WinLauncher.Core.Models;
+using WinLauncher.Infrastructure.Helpers;
 
 namespace WinLauncher
 {
@@ -346,6 +348,7 @@ namespace WinLauncher
                 }
             }
         }
+
     }
 
     /// <summary>

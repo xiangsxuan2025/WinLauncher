@@ -5,6 +5,7 @@ using System.IO;
 using System.Security.Principal;
 using System.Windows;
 using WinLauncher.Core.Interfaces;
+using WinLauncher.Infrastructure.Helpers;
 
 namespace WinLauncher
 {

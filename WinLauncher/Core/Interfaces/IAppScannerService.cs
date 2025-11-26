@@ -13,11 +13,6 @@ namespace WinLauncher.Core.Interfaces
         /// </summary>
         Task<List<AppInfo>> ScanInstalledAppsAsync();
 
-        /// <summary>
-        /// 异步获取应用的图标
-        /// </summary>
-        Task<BitmapImage> GetAppIconAsync(string executablePath);
-
         // 新增：专门扫描 UWP 和应用商店应用
         Task<List<AppInfo>> ScanUwpAppsAsync();
 

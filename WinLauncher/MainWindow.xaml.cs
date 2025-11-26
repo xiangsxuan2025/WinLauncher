@@ -16,19 +16,7 @@ namespace WinLauncher
             InitializeComponent();
 
             // 设置数据上下文
-            if (App.ServiceProvider != null)
-            {
-                // 使用依赖注入获取 ViewModel
-                this.DataContext = App.ServiceProvider.GetService<MainViewModel>();
-            }
-            else
-            {
-                // 备用方案：直接创建 ViewModel
-                this.DataContext = new MainViewModel(
-                    new WindowsAppScannerService(new IconExtractorService()),
-                    new JsonDataService()
-                );
-            }
+            this.DataContext = App.ServiceProvider.GetService<MainViewModel>();
         }
 
         /// <summary>
