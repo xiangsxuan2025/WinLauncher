@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Diagnostics;
+using System.IO;
 using System.Security.Principal;
 using System.Windows;
 
@@ -58,6 +59,9 @@ namespace WinLauncher
         {
             base.OnStartup(e);
 
+            // 设置全局异常处理
+            SetupExceptionHandling();
+
             // 检查管理员权限，如果不是管理员则尝试重启
             if (!IsRunningAsAdministrator())
             {
@@ -87,7 +91,59 @@ namespace WinLauncher
             }
         }
 
+        private void SetupExceptionHandling()
+        {
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                var ex = e.ExceptionObject as Exception;
+                HandleException(ex, "AppDomain.UnhandledException");
+            };
+
+            DispatcherUnhandledException += (s, e) =>
+            {
+                HandleException(e.Exception, "Application.DispatcherUnhandledException");
+                e.Handled = true; // 防止应用崩溃
+            };
+
+            TaskScheduler.UnobservedTaskException += (s, e) =>
+            {
+                HandleException(e.Exception, "TaskScheduler.UnobservedTaskException");
+                e.SetObserved(); // 标记为已观察
+            };
+        }
+
+        private void HandleException(Exception ex, string source = null)
+        {
+            var message = $"发生未处理的异常{(source != null ? $" ({source})" : "")}:\n{ex}";
+
+            Debug.WriteLine(message);
+
+            // 记录到文件
+            LogToFile(message);
+
+            // 用户友好的错误消息
+            MessageBox.Show("应用程序遇到问题，部分功能可能无法正常使用。", "错误",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+
+        private void LogToFile(string message)
+        {
+            try
+            {
+                var logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "WinLauncher", "Logs");
+                Directory.CreateDirectory(logDir);
+                var logFile = Path.Combine(logDir, $"error_{DateTime.Now:yyyyMMdd}.log");
+
+                File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n\n");
+            }
+            catch
+            {
+                // 忽略日志记录错误
+            }
+        }
+
         /// <summary>
+
         /// 全局服务提供者，用于在应用内获取依赖注入的服务
         /// </summary>
         public static IServiceProvider ServiceProvider { get; private set; }
