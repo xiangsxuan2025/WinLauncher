@@ -37,4 +37,16 @@
 			<EmbedInteropTypes>true</EmbedInteropTypes>
 		</COMReference>
 	</ItemGroup>
+	<ItemGroup>
+	  <Folder Include="Common\Commands\" />
+	  <Folder Include="Common\Converters\" />
+	  <Folder Include="Core\Models\" />
+	  <Folder Include="Core\Services\" />
+	  <Folder Include="Core\Interfaces\" />
+	  <Folder Include="Core\Enums\" />
+	  <Folder Include="Infrastructure\" />
+	  <Folder Include="ViewModels\" />
+	  <Folder Include="Views\" />
+	  <Folder Include="Styles\" />
+	</ItemGroup>
 </Project>
