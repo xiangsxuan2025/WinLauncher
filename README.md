@@ -16,6 +16,8 @@
 ## ✨ 项目简介
 
 WinLauncher 是一款专为 Windows 设计的现代化应用启动器，灵感来源于 macOS 的 Launchpad。它提供了优雅的界面和强大的功能，让您能够快速找到并启动任何应用程序。
+<img width="1125" height="875" alt="image" src="https://github.com/user-attachments/assets/0624f629-127a-43c4-939f-7133f8c1c3a7" />
+
 
 ### 🎯 为什么选择 WinLauncher？
 
@@ -130,3 +132,4 @@ WinLauncher 是一款专为 Windows 设计的现代化应用启动器，灵感�
 
 ### 🤝 贡献指南
 欢迎所有形式的贡献！请阅读我们的贡献指南：
+
