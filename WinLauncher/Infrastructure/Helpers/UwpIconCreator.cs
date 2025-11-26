@@ -8,7 +8,7 @@ using System.Windows.Media.Imaging;
 
 namespace WinLauncher.Infrastructure.Helpers
 {
-    internal class UwpIcoCreater
+    internal class UwpIconCreator
     {
         /// <summary>
         /// 创建 UWP 应用默认图标

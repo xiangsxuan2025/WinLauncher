@@ -4,8 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using WinLauncher.Core.Models;
+using WinLauncher.Core.Entities;
 using WinLauncher.Infrastructure.Helpers;
+using WinLauncher.Infrastructure.Services;
 
 namespace WinLauncher.Infrastructure.Strategies
 {
@@ -225,7 +226,7 @@ namespace WinLauncher.Infrastructure.Strategies
                                             !string.IsNullOrEmpty(installLocation) &&
                                             IsStoreApp(displayName, publisher, installLocation))
                                         {
-                                            var appInfo = await new TodoTemp(_iconExtractor).CreateAppInfoFromInstallLocation(installLocation, displayName, null);
+                                            var appInfo = await new AppInfoCreator(_iconExtractor).CreateAppInfoFromInstallLocation(installLocation, displayName, null);
                                             if (appInfo != null)
                                             {
                                                 apps.Add(appInfo);

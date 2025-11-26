@@ -3,12 +3,12 @@ using System.Linq;
 using System.Security;
 using System.Windows;
 using System.Windows.Media.Imaging;
+using WinLauncher.Core.Entities;
 using WinLauncher.Core.Interfaces;
-using WinLauncher.Core.Models;
 using WinLauncher.Infrastructure.Helpers;
 using WinLauncher.Infrastructure.Strategies;
 
-namespace WinLauncher
+namespace WinLauncher.Infrastructure.Services
 {
     /// <summary>
     /// Windows 应用扫描服务实现
@@ -47,7 +47,7 @@ namespace WinLauncher
                 var results = await Task.WhenAll(scanTasks);
                 var allApps = results.SelectMany(x => x).ToList();
 
-                var distinctApps = allApps.Distinct(new AppInfoComparer()).ToList();
+                var distinctApps = allApps.Distinct(new AppInfoEqualityComparer()).ToList();
 
                 stopwatch.Stop();
                 _performanceMonitor.TrackScanPerformance(stopwatch.Elapsed, distinctApps.Count);

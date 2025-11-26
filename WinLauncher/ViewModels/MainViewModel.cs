@@ -11,11 +11,12 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
+using WinLauncher.Core.Entities;
 using WinLauncher.Core.Interfaces;
-using WinLauncher.Core.Models;
+using WinLauncher.Infrastructure.Services;
 using WinLauncher.Models;
 
-namespace WinLauncher
+namespace WinLauncher.ViewModels
 {
     public class MainViewModel : INotifyPropertyChanged
     {

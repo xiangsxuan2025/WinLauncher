@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics;
 
-namespace WinLauncher
+namespace WinLauncher.Infrastructure.Services
 {
     public class UsageAnalytics
     {

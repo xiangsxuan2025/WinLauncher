@@ -6,8 +6,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
-using WinLauncher.Core.Models;
+using WinLauncher.Core.Entities;
 using WinLauncher.Infrastructure.Helpers;
+using WinLauncher.Infrastructure.Services;
 
 namespace WinLauncher.Infrastructure.Strategies
 {
@@ -201,7 +202,7 @@ namespace WinLauncher.Infrastructure.Strategies
                                     !string.IsNullOrEmpty(installLocation) &&
                                     Directory.Exists(installLocation))
                                 {
-                                    var appInfo = await new TodoTemp(_iconExtractor).CreateAppInfoFromInstallLocation(installLocation, displayName, displayIcon);
+                                    var appInfo = await new AppInfoCreator(_iconExtractor).CreateAppInfoFromInstallLocation(installLocation, displayName, displayIcon);
                                     if (appInfo != null)
                                         apps.Add(appInfo);
                                 }
@@ -227,7 +228,7 @@ namespace WinLauncher.Infrastructure.Strategies
                                     !string.IsNullOrEmpty(installLocation) &&
                                     Directory.Exists(installLocation))
                                 {
-                                    var appInfo = await new TodoTemp(_iconExtractor).CreateAppInfoFromInstallLocation(installLocation, displayName, displayIcon);
+                                    var appInfo = await new AppInfoCreator(_iconExtractor).CreateAppInfoFromInstallLocation(installLocation, displayName, displayIcon);
                                     if (appInfo != null)
                                         apps.Add(appInfo);
                                 }

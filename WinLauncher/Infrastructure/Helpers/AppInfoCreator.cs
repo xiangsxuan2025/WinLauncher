@@ -4,16 +4,17 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using WinLauncher.Core.Models;
+using WinLauncher.Core.Entities;
+using WinLauncher.Infrastructure.Services;
 
 namespace WinLauncher.Infrastructure.Helpers
 {
     // 应用信息
-    internal class TodoTemp
+    internal class AppInfoCreator
     {
         private readonly IconExtractorService _iconExtractorService;
 
-        public TodoTemp(IconExtractorService iconExtractorService)
+        public AppInfoCreator(IconExtractorService iconExtractorService)
         {
             this._iconExtractorService = iconExtractorService;
         }

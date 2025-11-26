@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using WinLauncher.Core.Entities;
 using WinLauncher.Core.Interfaces;
-using WinLauncher.Core.Models;
+using WinLauncher.Infrastructure.Services;
 
 namespace WinLauncher.Infrastructure.Strategies
 {

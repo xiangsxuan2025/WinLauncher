@@ -2,8 +2,10 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using WinLauncher.Infrastructure;
+using WinLauncher.ViewModels;
 
-namespace WinLauncher
+namespace WinLauncher.Views
 {
     /// <summary>
     /// 主窗口类

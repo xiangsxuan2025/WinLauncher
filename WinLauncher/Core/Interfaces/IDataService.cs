@@ -1,3 +1,4 @@
+using WinLauncher.Core.ValueObjects;
 using WinLauncher.Models;
 
 namespace WinLauncher.Core.Interfaces

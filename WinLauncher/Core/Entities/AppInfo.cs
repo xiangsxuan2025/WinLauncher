@@ -1,14 +1,15 @@
+using CommunityToolkit.Mvvm.ComponentModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Media.Imaging;
 
-namespace WinLauncher.Core.Models
+namespace WinLauncher.Core.Entities
 {
     /// <summary>
     /// 应用信息类
     /// 表示一个应用程序的基本信息
     /// </summary>
-    public class AppInfo : INotifyPropertyChanged
+    public class AppInfo : ObservableObject
     {
         private string _id;
         private string _name;
@@ -71,6 +72,31 @@ namespace WinLauncher.Core.Models
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    /// <summary>
+    /// 应用信息比较器，用于去重操作
+    /// 通过应用的 Id 属性来判断两个 AppInfo 对象是否相等
+    /// </summary>
+    public class AppInfoEqualityComparer : IEqualityComparer<AppInfo>
+    {
+        /// <summary>
+        /// 比较两个 AppInfo 对象是否相等
+        /// </summary>
+        public bool Equals(AppInfo x, AppInfo y)
+        {
+            if (ReferenceEquals(x, y)) return true;
+            if (x is null || y is null) return false;
+            return x.Id == y.Id; // 基于应用路径判断是否相同应用
+        }
+
+        /// <summary>
+        /// 获取 AppInfo 对象的哈希码
+        /// </summary>
+        public int GetHashCode(AppInfo obj)
+        {
+            return obj.Id?.GetHashCode() ?? 0;
         }
     }
 }

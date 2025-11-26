@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using WinLauncher.Core.Models;
+using WinLauncher.Core.Entities;
 
 namespace WinLauncher.Core.Interfaces
 {

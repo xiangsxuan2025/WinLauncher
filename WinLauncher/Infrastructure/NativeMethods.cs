@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace WinLauncher
+namespace WinLauncher.Infrastructure
 {
     /// <summary>
     /// 原生方法类

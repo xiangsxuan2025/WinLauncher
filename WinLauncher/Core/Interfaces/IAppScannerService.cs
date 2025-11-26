@@ -1,5 +1,5 @@
 using System.Windows.Media.Imaging;
-using WinLauncher.Core.Models;
+using WinLauncher.Core.Entities;
 
 namespace WinLauncher.Core.Interfaces
 {

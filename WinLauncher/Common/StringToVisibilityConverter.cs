@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 
-namespace WinLauncher
+namespace WinLauncher.Common.Converters
 {
     /// <summary>
     /// 字符串到可见性转换器

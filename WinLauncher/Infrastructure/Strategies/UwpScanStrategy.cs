@@ -4,8 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using WinLauncher.Core.Models;
+using WinLauncher.Core.Entities;
 using WinLauncher.Infrastructure.Helpers;
+using WinLauncher.Infrastructure.Services;
 
 namespace WinLauncher.Infrastructure.Strategies
 {
@@ -129,7 +130,7 @@ namespace WinLauncher.Infrastructure.Strategies
                                     Name = name,
                                     DisplayName = name,
                                     ExecutablePath = appId, // UWP 应用使用 AppID 作为标识
-                                    Icon = await UwpIcoCreater.CreateUwpDefaultIcon()
+                                    Icon = await UwpIconCreator.CreateUwpDefaultIcon()
                                 };
 
                                 apps.Add(appInfo);
@@ -350,7 +351,7 @@ namespace WinLauncher.Infrastructure.Strategies
                                                 Name = displayName,
                                                 DisplayName = displayName,
                                                 ExecutablePath = $"UWP:{subKeyName}",
-                                                Icon = await UwpIcoCreater.CreateUwpDefaultIcon()
+                                                Icon = await UwpIconCreator.CreateUwpDefaultIcon()
                                             };
 
                                             apps.Add(appInfo);
