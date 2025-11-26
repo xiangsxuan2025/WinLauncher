@@ -1,48 +1,60 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Windows.Media.Imaging;
 
 namespace WinLauncher
-{// Services/IconExtractorService.cs
-    using System;
-    using System.Drawing;
-    using System.Drawing.Imaging;
-    using System.IO;
-    using System.Runtime.InteropServices;
-    using System.Threading.Tasks;
-    using System.Windows.Media.Imaging;
-
+{
+    /// <summary>
+    /// 图标提取服务
+    /// 负责从可执行文件中提取应用程序图标
+    /// 使用多种方法确保兼容性和可靠性
+    /// </summary>
     public class IconExtractorService
     {
+        // Windows API 函数声明
+
+        /// <summary>
+        /// 从可执行文件中提取关联的图标
+        /// </summary>
         [DllImport("shell32.dll", CharSet = CharSet.Auto)]
         private static extern IntPtr ExtractAssociatedIcon(IntPtr hInst, string lpIconPath, out IntPtr lpiIcon);
 
+        /// <summary>
+        /// 销毁图标句柄，释放资源
+        /// </summary>
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool DestroyIcon(IntPtr hIcon);
 
+        /// <summary>
+        /// 获取文件信息，包括图标
+        /// </summary>
         [DllImport("shell32.dll")]
         private static extern IntPtr SHGetFileInfo(string pszPath, uint dwFileAttributes, ref SHFILEINFO psfi, uint cbSizeFileInfo, uint uFlags);
 
+        /// <summary>
+        /// 文件信息结构体
+        /// </summary>
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
         private struct SHFILEINFO
         {
-            public IntPtr hIcon;
-            public int iIcon;
-            public uint dwAttributes;
-
-            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-            public string szDisplayName;
-
-            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 80)]
-            public string szTypeName;
+            public IntPtr hIcon; // 图标句柄
+            public int iIcon; // 图标索引
+            public uint dwAttributes; // 文件属性
+            public string szDisplayName; // 显示名称
+            public string szTypeName; // 类型名称
         }
 
-        private const uint SHGFI_ICON = 0x100;
-        private const uint SHGFI_LARGEICON = 0x0;
-        private const uint SHGFI_SMALLICON = 0x1;
+        // Windows API 常量
+        private const uint SHGFI_ICON = 0x100; // 获取图标
+        private const uint SHGFI_LARGEICON = 0x0; // 大图标
+        private const uint SHGFI_SMALLICON = 0x1; // 小图标
 
+        /// <summary>
+        /// 异步获取应用图标
+        /// 使用多种方法确保成功提取图标
+        /// </summary>
         public async Task<BitmapImage> GetAppIconAsync(string filePath)
         {
             return await Task.Run(() =>
@@ -52,7 +64,7 @@ namespace WinLauncher
                     if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
                     {
                         System.Diagnostics.Debug.WriteLine($"文件不存在: {filePath}");
-                        return CreateDefaultIcon();
+                        return CreateDefaultIcon(); // 返回默认图标
                     }
 
                     // 方法1: 使用 ExtractAssociatedIcon (最可靠)
@@ -71,7 +83,7 @@ namespace WinLauncher
                         return iconFromDrawing;
 
                     System.Diagnostics.Debug.WriteLine($"所有图标提取方法都失败了: {filePath}");
-                    return CreateDefaultIcon();
+                    return CreateDefaultIcon(); // 所有方法都失败时返回默认图标
                 }
                 catch (Exception ex)
                 {
@@ -81,6 +93,9 @@ namespace WinLauncher
             });
         }
 
+        /// <summary>
+        /// 使用 ExtractAssociatedIcon API 提取图标
+        /// </summary>
         private BitmapImage ExtractIconUsingAPI(string filePath)
         {
             IntPtr hIcon = IntPtr.Zero;
@@ -103,11 +118,14 @@ namespace WinLauncher
             finally
             {
                 if (hIcon != IntPtr.Zero)
-                    DestroyIcon(hIcon);
+                    DestroyIcon(hIcon); // 清理资源
             }
             return null;
         }
 
+        /// <summary>
+        /// 使用 SHGetFileInfo API 提取图标
+        /// </summary>
         private BitmapImage ExtractIconUsingShell(string filePath)
         {
             SHFILEINFO shFileInfo = new SHFILEINFO();
@@ -130,11 +148,14 @@ namespace WinLauncher
             finally
             {
                 if (shFileInfo.hIcon != IntPtr.Zero)
-                    DestroyIcon(shFileInfo.hIcon);
+                    DestroyIcon(shFileInfo.hIcon); // 清理资源
             }
             return null;
         }
 
+        /// <summary>
+        /// 使用 System.Drawing.Icon 提取图标
+        /// </summary>
         private BitmapImage ExtractIconUsingDrawing(string filePath)
         {
             try
@@ -156,6 +177,9 @@ namespace WinLauncher
             return null;
         }
 
+        /// <summary>
+        /// 将 System.Drawing.Icon 转换为 WPF 的 BitmapImage
+        /// </summary>
         private BitmapImage ConvertIconToBitmapImage(Icon icon)
         {
             try
@@ -171,10 +195,10 @@ namespace WinLauncher
                     var bitmapImage = new BitmapImage();
                     bitmapImage.BeginInit();
                     bitmapImage.StreamSource = stream;
-                    bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-                    bitmapImage.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+                    bitmapImage.CacheOption = BitmapCacheOption.OnLoad; // 立即加载
+                    bitmapImage.CreateOptions = BitmapCreateOptions.IgnoreImageCache; // 忽略缓存
                     bitmapImage.EndInit();
-                    bitmapImage.Freeze();
+                    bitmapImage.Freeze(); // 冻结对象，使其可以在其他线程使用
 
                     return bitmapImage;
                 }
@@ -186,6 +210,10 @@ namespace WinLauncher
             }
         }
 
+        /// <summary>
+        /// 创建默认应用图标
+        /// 当无法提取图标时使用
+        /// </summary>
         private BitmapImage CreateDefaultIcon()
         {
             try
@@ -244,9 +272,15 @@ namespace WinLauncher
         }
     }
 
-    // Graphics 扩展方法用于绘制圆角矩形
+    /// <summary>
+    /// Graphics 扩展方法
+    /// 用于绘制圆角矩形等高级图形操作
+    /// </summary>
     public static class GraphicsExtensions
     {
+        /// <summary>
+        /// 绘制圆角矩形边框
+        /// </summary>
         public static void DrawRoundedRectangle(this System.Drawing.Graphics graphics, System.Drawing.Pen pen, System.Drawing.Rectangle bounds, int cornerRadius)
         {
             using (var path = CreateRoundedRectanglePath(bounds, cornerRadius))
@@ -255,6 +289,9 @@ namespace WinLauncher
             }
         }
 
+        /// <summary>
+        /// 填充圆角矩形
+        /// </summary>
         public static void FillRoundedRectangle(this System.Drawing.Graphics graphics, System.Drawing.Brush brush, System.Drawing.Rectangle bounds, int cornerRadius)
         {
             using (var path = CreateRoundedRectanglePath(bounds, cornerRadius))
@@ -263,6 +300,9 @@ namespace WinLauncher
             }
         }
 
+        /// <summary>
+        /// 创建圆角矩形路径
+        /// </summary>
         private static System.Drawing.Drawing2D.GraphicsPath CreateRoundedRectanglePath(System.Drawing.Rectangle bounds, int radius)
         {
             var diameter = radius * 2;
@@ -276,18 +316,18 @@ namespace WinLauncher
                 return path;
             }
 
-            // 左上角
+            // 左上角圆弧
             path.AddArc(arc, 180, 90);
 
-            // 右上角
+            // 右上角圆弧
             arc.X = bounds.Right - diameter;
             path.AddArc(arc, 270, 90);
 
-            // 右下角
+            // 右下角圆弧
             arc.Y = bounds.Bottom - diameter;
             path.AddArc(arc, 0, 90);
 
-            // 左下角
+            // 左下角圆弧
             arc.X = bounds.Left;
             path.AddArc(arc, 90, 90);
 

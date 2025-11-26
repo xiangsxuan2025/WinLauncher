@@ -5,31 +5,41 @@ using System.Windows.Media.Imaging;
 
 namespace WinLauncher.Models
 {
-    // Models/AppInfo.cs
+    /// <summary>
+    /// 应用信息类
+    /// 表示一个应用程序的基本信息
+    /// </summary>
     public class AppInfo : INotifyPropertyChanged
     {
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public string DisplayName { get; set; }
-        public string ExecutablePath { get; set; }
-        public BitmapImage Icon { get; set; }
-        public bool IsSystemApp { get; set; }
+        public string Id { get; set; } // 唯一标识符（通常为可执行文件路径）
+        public string Name { get; set; } // 应用名称
+        public string DisplayName { get; set; } // 显示名称
+        public string ExecutablePath { get; set; } // 可执行文件路径
+        public BitmapImage Icon { get; set; } // 应用图标
+        public bool IsSystemApp { get; set; } // 是否为系统应用
 
         public event PropertyChangedEventHandler PropertyChanged;
     }
 
-    // Models/FolderInfo.cs
+    /// <summary>
+    /// 文件夹信息类
+    /// 表示一个包含多个应用的文件夹
+    /// </summary>
     public class FolderInfo : INotifyPropertyChanged
     {
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public ObservableCollection<AppInfo> Apps { get; set; }
-        public BitmapImage FolderIcon { get; set; }
+        public string Id { get; set; } // 文件夹唯一标识符
+        public string Name { get; set; } // 文件夹名称
+        public ObservableCollection<AppInfo> Apps { get; set; } // 文件夹中的应用集合
+        public BitmapImage FolderIcon { get; set; } // 文件夹图标
 
         public event PropertyChangedEventHandler PropertyChanged;
     }
 
-    // Models/LaunchpadItem.cs
+    /// <summary>
+    /// 启动台项目类
+    /// 表示启动台中的一个项目，可以是应用、文件夹、空位或丢失的应用
+    /// 支持多种类型，统一管理
+    /// </summary>
     public class LaunchpadItem : INotifyPropertyChanged
     {
         private ItemType _type;
@@ -38,6 +48,9 @@ namespace WinLauncher.Models
         private string _emptyToken;
         private MissingAppPlaceholder _missingApp;
 
+        /// <summary>
+        /// 项目类型
+        /// </summary>
         public ItemType Type
         {
             get => _type;
@@ -45,11 +58,14 @@ namespace WinLauncher.Models
             {
                 _type = value;
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(DisplayName));
-                OnPropertyChanged(nameof(Icon));
+                OnPropertyChanged(nameof(DisplayName)); // 类型改变时更新显示名称
+                OnPropertyChanged(nameof(Icon)); // 类型改变时更新图标
             }
         }
 
+        /// <summary>
+        /// 应用信息（当 Type 为 App 时有效）
+        /// </summary>
         public AppInfo App
         {
             get => _app;
@@ -62,6 +78,9 @@ namespace WinLauncher.Models
             }
         }
 
+        /// <summary>
+        /// 文件夹信息（当 Type 为 Folder 时有效）
+        /// </summary>
         public FolderInfo Folder
         {
             get => _folder;
@@ -74,6 +93,9 @@ namespace WinLauncher.Models
             }
         }
 
+        /// <summary>
+        /// 空位标识（当 Type 为 Empty 时有效）
+        /// </summary>
         public string EmptyToken
         {
             get => _emptyToken;
@@ -85,6 +107,9 @@ namespace WinLauncher.Models
             }
         }
 
+        /// <summary>
+        /// 丢失的应用占位符（当 Type 为 MissingApp 时有效）
+        /// </summary>
         public MissingAppPlaceholder MissingApp
         {
             get => _missingApp;
@@ -97,6 +122,10 @@ namespace WinLauncher.Models
             }
         }
 
+        /// <summary>
+        /// 项目唯一标识符
+        /// 根据类型生成不同的标识符
+        /// </summary>
         public string Id
         {
             get
@@ -112,6 +141,10 @@ namespace WinLauncher.Models
             }
         }
 
+        /// <summary>
+        /// 显示名称
+        /// 根据类型返回相应的显示名称
+        /// </summary>
         public string DisplayName
         {
             get
@@ -127,6 +160,10 @@ namespace WinLauncher.Models
             }
         }
 
+        /// <summary>
+        /// 项目图标
+        /// 根据类型返回相应的图标
+        /// </summary>
         public BitmapImage Icon
         {
             get
@@ -164,6 +201,9 @@ namespace WinLauncher.Models
             return new LaunchpadItem { Type = ItemType.Empty, EmptyToken = token };
         }
 
+        /// <summary>
+        /// 创建透明图标（用于空位）
+        /// </summary>
         private BitmapImage CreateTransparentIcon()
         {
             // 创建透明图标
@@ -174,6 +214,9 @@ namespace WinLauncher.Models
             return bitmap;
         }
 
+        /// <summary>
+        /// 创建默认图标
+        /// </summary>
         private BitmapImage CreateDefaultIcon()
         {
             // 创建默认图标
@@ -192,14 +235,21 @@ namespace WinLauncher.Models
         }
     }
 
+    /// <summary>
+    /// 项目类型枚举
+    /// </summary>
     public enum ItemType
     {
-        App,
-        Folder,
-        Empty,
-        MissingApp
+        App, // 应用程序
+        Folder, // 文件夹
+        Empty, // 空位
+        MissingApp // 丢失的应用
     }
 
+    /// <summary>
+    /// 丢失的应用占位符
+    /// 当应用被卸载或移动时使用
+    /// </summary>
     public class MissingAppPlaceholder : INotifyPropertyChanged, IEquatable<MissingAppPlaceholder>
     {
         private string _bundlePath;
@@ -237,8 +287,14 @@ namespace WinLauncher.Models
             }
         }
 
+        /// <summary>
+        /// 唯一标识符（使用 BundlePath）
+        /// </summary>
         public string Id => BundlePath;
 
+        /// <summary>
+        /// 图标，如果为空则创建默认图标
+        /// </summary>
         public BitmapImage Icon
         {
             get => _icon ?? CreateDefaultIcon();
@@ -256,6 +312,10 @@ namespace WinLauncher.Models
             RemovableSource = removableSource;
         }
 
+        /// <summary>
+        /// 创建默认的丢失应用图标
+        /// 显示问号和虚线边框
+        /// </summary>
         public static BitmapImage CreateDefaultIcon()
         {
             try
@@ -327,6 +387,9 @@ namespace WinLauncher.Models
             }
         }
 
+        /// <summary>
+        /// 创建圆角矩形路径
+        /// </summary>
         private static System.Drawing.Drawing2D.GraphicsPath CreateRoundedRectanglePath(System.Drawing.Rectangle bounds, int radius)
         {
             var path = new System.Drawing.Drawing2D.GraphicsPath();

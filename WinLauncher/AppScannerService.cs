@@ -1,22 +1,31 @@
-// Services/WindowsAppScannerService.cs
 using System.IO;
+using System.Linq;
+using System.Security;
+using System.Windows.Media.Imaging;
 using WinLauncher.Models;
 
 namespace WinLauncher
 {
-    // Services/IAppScannerService.cs
-    using System.Collections.Generic;
-    using System.Security;
-    using System.Threading.Tasks;
-    using System.Windows.Media.Imaging;
-
+    /// <summary>
+    /// 应用扫描服务接口定义
+    /// </summary>
     public interface IAppScannerService
     {
+        /// <summary>
+        /// 异步扫描系统中已安装的应用
+        /// </summary>
         Task<List<AppInfo>> ScanInstalledAppsAsync();
 
+        /// <summary>
+        /// 异步获取应用的图标
+        /// </summary>
         Task<BitmapImage> GetAppIconAsync(string executablePath);
     }
 
+    /// <summary>
+    /// Windows 应用扫描服务实现
+    /// 负责从多个来源扫描和发现已安装的应用程序
+    /// </summary>
     public class WindowsAppScannerService : IAppScannerService
     {
         private readonly IconExtractorService _iconExtractor;
@@ -26,16 +35,24 @@ namespace WinLauncher
             _iconExtractor = iconExtractor;
         }
 
+        /// <summary>
+        /// 扫描已安装的应用，并从多个来源收集应用信息
+        /// </summary>
         public async Task<List<AppInfo>> ScanInstalledAppsAsync()
         {
             var apps = new List<AppInfo>();
 
-            // 只扫描当前用户有权限访问的目录
+            // 扫描安全的目录（避免权限问题）
             await ScanSafeDirectories(apps);
 
+            // 使用比较器去重后返回
             return apps.Distinct(new AppInfoComparer()).ToList();
         }
 
+        /// <summary>
+        /// 扫描安全的目录来发现应用
+        /// 包括：开始菜单、桌面快捷方式、程序文件目录、注册表
+        /// </summary>
         private async Task ScanSafeDirectories(List<AppInfo> apps)
         {
             // 1. 扫描当前用户的开始菜单（通常有权限）
@@ -51,6 +68,9 @@ namespace WinLauncher
             await ScanFromRegistry(apps);
         }
 
+        /// <summary>
+        /// 扫描当前用户的开始菜单目录
+        /// </summary>
         private async Task ScanCurrentUserStartMenu(List<AppInfo> apps)
         {
             try
@@ -75,6 +95,9 @@ namespace WinLauncher
             }
         }
 
+        /// <summary>
+        /// 扫描桌面快捷方式
+        /// </summary>
         private async Task ScanDesktopShortcuts(List<AppInfo> apps)
         {
             try
@@ -91,13 +114,16 @@ namespace WinLauncher
             }
         }
 
+        /// <summary>
+        /// 扫描程序文件目录（Program Files）
+        /// </summary>
         private async Task ScanCommonProgramFiles(List<AppInfo> apps)
         {
             var programFilesPaths = new[]
             {
-            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)
-        };
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)
+            };
 
             foreach (var programFilesPath in programFilesPaths)
             {
@@ -123,10 +149,14 @@ namespace WinLauncher
             }
         }
 
+        /// <summary>
+        /// 扫描指定目录中的快捷方式文件 (.lnk)
+        /// </summary>
         private async Task ScanDirectoryForShortcuts(string directory, List<AppInfo> apps)
         {
             try
             {
+                // 递归搜索所有 .lnk 文件
                 var lnkFiles = Directory.GetFiles(directory, "*.lnk", SearchOption.AllDirectories);
 
                 foreach (var lnkFile in lnkFiles)
@@ -149,26 +179,19 @@ namespace WinLauncher
             }
         }
 
+        /// <summary>
+        /// 扫描常见的应用程序目录
+        /// 避免深度扫描整个 Program Files 目录，提高性能
+        /// </summary>
         private async Task ScanCommonApplications(string programFilesPath, List<AppInfo> apps)
         {
             // 只扫描常见的应用程序目录，避免深度扫描整个程序文件目录
             var commonAppDirs = new[]
             {
-            "Microsoft Office",
-            "Google",
-            "Mozilla Firefox",
-            "Adobe",
-            "VideoLAN",
-            "Notepad++",
-            "7-Zip",
-            "WinRAR",
-            "VLC",
-            "Spotify",
-            "Discord",
-            "Slack",
-            "Microsoft Edge",
-            "Windows Media Player"
-        };
+                "Microsoft Office", "Google", "Mozilla Firefox", "Adobe", "VideoLAN",
+                "Notepad++", "7-Zip", "WinRAR", "VLC", "Spotify", "Discord", "Slack",
+                "Microsoft Edge", "Windows Media Player"
+            };
 
             foreach (var appDirName in commonAppDirs)
             {
@@ -180,17 +203,21 @@ namespace WinLauncher
             }
         }
 
+        /// <summary>
+        /// 扫描应用程序目录中的可执行文件
+        /// </summary>
         private async Task ScanApplicationDirectory(string appDir, List<AppInfo> apps)
         {
             try
             {
-                // 只扫描顶级目录和一级子目录，避免深度扫描
+                // 限制扫描深度，只扫描顶级目录和一级子目录
                 var searchOptions = new EnumerationOptions
                 {
-                    MaxRecursionDepth = 1,
-                    IgnoreInaccessible = true
+                    MaxRecursionDepth = 1, // 最大递归深度为1
+                    IgnoreInaccessible = true // 忽略无法访问的目录
                 };
 
+                // 获取所有 .exe 文件，并过滤掉系统文件和安装程序
                 var exeFiles = Directory.GetFiles(appDir, "*.exe", searchOptions)
                     .Where(f => !IsSystemOrInstallerFile(f));
 
@@ -214,6 +241,10 @@ namespace WinLauncher
             }
         }
 
+        /// <summary>
+        /// 判断文件是否为系统文件或安装程序
+        /// 用于过滤掉不需要显示的可执行文件
+        /// </summary>
         private bool IsSystemOrInstallerFile(string filePath)
         {
             var fileName = Path.GetFileName(filePath).ToLowerInvariant();
@@ -221,14 +252,17 @@ namespace WinLauncher
             // 排除安装程序、卸载程序、系统文件等
             var excludedKeywords = new[]
             {
-            "uninstall", "install", "setup", "update", "patch",
-            "helper", "service", "runtime", "launcher", "crash",
-            "debug", "diagnostics", "repair", "unins"
-        };
+                "uninstall", "install", "setup", "update", "patch",
+                "helper", "service", "runtime", "launcher", "crash",
+                "debug", "diagnostics", "repair", "unins"
+            };
 
             return excludedKeywords.Any(keyword => fileName.Contains(keyword));
         }
 
+        /// <summary>
+        /// 从 Windows 注册表中扫描已安装的应用信息
+        /// </summary>
         private async Task ScanFromRegistry(List<AppInfo> apps)
         {
             try
@@ -243,13 +277,16 @@ namespace WinLauncher
             }
         }
 
+        /// <summary>
+        /// 从注册表的卸载信息中获取已安装应用
+        /// </summary>
         private async Task<List<AppInfo>> GetInstalledAppsFromRegistry()
         {
             var apps = new List<AppInfo>();
 
             try
             {
-                // 读取注册表中的已安装应用
+                // 读取 64 位系统的注册表项
                 using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"))
                 {
                     if (key != null)
@@ -262,6 +299,7 @@ namespace WinLauncher
                                 var installLocation = subKey?.GetValue("InstallLocation") as string;
                                 var displayIcon = subKey?.GetValue("DisplayIcon") as string;
 
+                                // 验证必要的应用信息
                                 if (!string.IsNullOrEmpty(displayName) &&
                                     !string.IsNullOrEmpty(installLocation) &&
                                     Directory.Exists(installLocation))
@@ -275,7 +313,7 @@ namespace WinLauncher
                     }
                 }
 
-                // 同样检查32位系统上的注册表
+                // 读取 32 位系统上的注册表项（在 64 位系统上）
                 using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"))
                 {
                     if (key != null)
@@ -309,13 +347,16 @@ namespace WinLauncher
             return apps;
         }
 
+        /// <summary>
+        /// 从安装位置创建应用信息
+        /// </summary>
         private async Task<AppInfo> CreateAppInfoFromInstallLocation(string installLocation, string displayName, string displayIcon)
         {
             try
             {
                 string exePath = null;
 
-                // 如果有指定的图标路径，使用它
+                // 优先使用注册表中指定的图标路径
                 if (!string.IsNullOrEmpty(displayIcon) && File.Exists(displayIcon))
                 {
                     exePath = displayIcon;
@@ -337,7 +378,7 @@ namespace WinLauncher
 
                     return new AppInfo
                     {
-                        Id = exePath,
+                        Id = exePath, // 使用可执行文件路径作为唯一标识
                         Name = displayName,
                         DisplayName = displayName,
                         ExecutablePath = exePath,
@@ -353,7 +394,9 @@ namespace WinLauncher
             return null;
         }
 
-        // 原有的方法保持不变，但添加异常处理
+        /// <summary>
+        /// 从快捷方式文件 (.lnk) 创建应用信息
+        /// </summary>
         private async Task<AppInfo> CreateAppInfoFromShortcut(string lnkPath)
         {
             try
@@ -383,6 +426,9 @@ namespace WinLauncher
             return null;
         }
 
+        /// <summary>
+        /// 从可执行文件创建应用信息
+        /// </summary>
         private async Task<AppInfo> CreateAppInfoFromExecutable(string exePath)
         {
             try
@@ -407,15 +453,20 @@ namespace WinLauncher
             return null;
         }
 
-        // 原有的 ResolveShortcutTarget 和 GetAppIconAsync 方法保持不变
+        /// <summary>
+        /// 获取应用的图标
+        /// </summary>
         public async Task<BitmapImage> GetAppIconAsync(string executablePath)
         {
             return await _iconExtractor.GetAppIconAsync(executablePath);
         }
 
+        /// <summary>
+        /// 解析快捷方式文件的目标路径
+        /// 使用多种方法确保兼容性
+        /// </summary>
         private async Task<string> ResolveShortcutTarget(string lnkPath)
         {
-            // 原有的实现
             try
             {
                 // 方法1: 尝试从 .lnk 文件所在目录查找同名的 .exe 文件
@@ -426,7 +477,7 @@ namespace WinLauncher
                 if (File.Exists(possibleExePath))
                     return possibleExePath;
 
-                // 方法2: 使用 Windows Script Host
+                // 方法2: 使用 Windows Script Host (COM)
                 try
                 {
                     var shellType = Type.GetTypeFromProgID("WScript.Shell");
@@ -442,7 +493,7 @@ namespace WinLauncher
                     // 如果 COM 方法失败，回退到其他方法
                 }
 
-                return lnkPath;
+                return lnkPath; // 如果所有方法都失败，返回原始路径
             }
             catch (Exception ex)
             {

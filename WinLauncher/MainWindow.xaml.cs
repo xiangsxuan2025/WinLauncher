@@ -1,20 +1,13 @@
 using Microsoft.Extensions.DependencyInjection;
-using System.Text;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
 namespace WinLauncher
 {
     /// <summary>
-    /// Interaction logic for MainWindow.xaml
+    /// 主窗口类
+    /// 负责 UI 显示和用户交互
     /// </summary>
     public partial class MainWindow : Window
     {
@@ -22,10 +15,10 @@ namespace WinLauncher
         {
             InitializeComponent();
 
-            // 更安全的方式设置 DataContext
-
+            // 设置数据上下文
             if (App.ServiceProvider != null)
             {
+                // 使用依赖注入获取 ViewModel
                 this.DataContext = App.ServiceProvider.GetService<MainViewModel>();
             }
             else
@@ -38,6 +31,10 @@ namespace WinLauncher
             }
         }
 
+        /// <summary>
+        /// 窗口源初始化完成后调用
+        /// 用于启用窗口阴影等效果
+        /// </summary>
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
@@ -57,16 +54,25 @@ namespace WinLauncher
             }
         }
 
+        /// <summary>
+        /// 窗口鼠标左键按下事件，支持窗口拖动
+        /// </summary>
         private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            DragMove();
+            DragMove(); // 拖动窗口
         }
 
+        /// <summary>
+        /// 最小化按钮点击事件
+        /// </summary>
         private void MinimizeButton_Click(object sender, RoutedEventArgs e)
         {
             this.WindowState = WindowState.Minimized;
         }
 
+        /// <summary>
+        /// 关闭按钮点击事件
+        /// </summary>
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
             this.Close();

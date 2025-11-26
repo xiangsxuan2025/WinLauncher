@@ -1,14 +1,11 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Windows.Input;
 
 namespace WinLauncher
 {
-    using System;
-    using System.Windows.Input;
-
+    /// <summary>
+    /// 通用命令实现，用于在 MVVM 模式中绑定命令
+    /// 无参数版本
+    /// </summary>
     public class RelayCommand : ICommand
     {
         private readonly Action _execute;
@@ -20,17 +17,30 @@ namespace WinLauncher
             _canExecute = canExecute;
         }
 
+        /// <summary>
+        /// 当命令的可执行状态改变时触发
+        /// 使用 CommandManager 自动重新查询建议
+        /// </summary>
         public event EventHandler CanExecuteChanged
         {
             add { CommandManager.RequerySuggested += value; }
             remove { CommandManager.RequerySuggested -= value; }
         }
 
+        /// <summary>
+        /// 判断命令是否可以执行
+        /// </summary>
         public bool CanExecute(object parameter) => _canExecute?.Invoke() ?? true;
 
+        /// <summary>
+        /// 执行命令
+        /// </summary>
         public void Execute(object parameter) => _execute();
     }
 
+    /// <summary>
+    /// 泛型命令实现，支持带参数的命令
+    /// </summary>
     public class RelayCommand<T> : ICommand
     {
         private readonly Action<T> _execute;
@@ -48,6 +58,9 @@ namespace WinLauncher
             remove { CommandManager.RequerySuggested -= value; }
         }
 
+        /// <summary>
+        /// 判断命令是否可以执行，处理参数类型转换
+        /// </summary>
         public bool CanExecute(object parameter)
         {
             if (parameter is T typedParameter)
@@ -64,6 +77,9 @@ namespace WinLauncher
             return false;
         }
 
+        /// <summary>
+        /// 执行命令，处理参数类型转换
+        /// </summary>
         public void Execute(object parameter)
         {
             if (parameter is T typedParameter)
