@@ -82,9 +82,11 @@ namespace WinLauncher
                 ServiceProvider = services.BuildServiceProvider();
 
                 // 创建并显示主窗口
-                var mainWindow = new MainWindow();
-                mainWindow.DataContext = ServiceProvider.GetService<MainViewModel>();
-                mainWindow.Show();
+                var mainWindow = ServiceProvider.GetService<MainWindow>();
+                if (mainWindow != null)
+                {
+                    mainWindow.Show();
+                }
             }
             catch (Exception ex)
             {
