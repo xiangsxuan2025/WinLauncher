@@ -35,10 +35,12 @@ namespace WinLauncher
     public class WindowsAppScannerService : IAppScannerService
     {
         private readonly IconExtractorService _iconExtractor;
+        private readonly PerformanceMonitor _performanceMonitor;
 
         public WindowsAppScannerService(IconExtractorService iconExtractor)
         {
             _iconExtractor = iconExtractor;
+            _performanceMonitor = new PerformanceMonitor();
         }
 
         /// <summary>
@@ -63,6 +65,7 @@ namespace WinLauncher
                 var distinctApps = allApps.Distinct(new AppInfoComparer()).ToList();
 
                 stopwatch.Stop();
+                _performanceMonitor.TrackScanPerformance(stopwatch.Elapsed, distinctApps.Count);
 
                 return distinctApps;
             }

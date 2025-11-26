@@ -18,6 +18,7 @@ namespace WinLauncher
     {
         private readonly IAppScannerService _appScanner;
         private readonly IDataService _dataService;
+        private readonly UsageAnalytics _usageAnalytics;
         private readonly DispatcherTimer _searchTimer;
         private List<LaunchpadItem> _allItems = new List<LaunchpadItem>();
 
@@ -75,6 +76,7 @@ namespace WinLauncher
         {
             _appScanner = appScanner;
             _dataService = dataService;
+            _usageAnalytics = new UsageAnalytics();
             // 搜索防抖定时器
             _searchTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
             _searchTimer.Tick += (s, e) =>
@@ -179,6 +181,7 @@ namespace WinLauncher
             else
             {
                 FilterItems();
+                _usageAnalytics.TrackSearchUsage(SearchText, Items.Count);
             }
         }
 
@@ -293,6 +296,7 @@ namespace WinLauncher
                 });
 
                 stopwatch.Stop();
+                _usageAnalytics.TrackAppLaunch(app.DisplayName, stopwatch.Elapsed);
             }
             catch (System.Exception ex)
             {

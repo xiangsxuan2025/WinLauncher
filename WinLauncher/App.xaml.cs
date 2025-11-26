@@ -158,6 +158,10 @@ namespace WinLauncher
             services.AddSingleton<IAppScannerService, WindowsAppScannerService>(); // 应用扫描服务
             services.AddSingleton<IDataService, JsonDataService>(); // 数据存储服务
 
+            // 工具服务
+            services.AddSingleton<PerformanceMonitor>();
+            services.AddSingleton<UsageAnalytics>();
+
             // 注册 ViewModels 和 Views
             services.AddTransient<MainViewModel>(); // 主视图模型
             services.AddTransient<MainWindow>(); // 主窗口
