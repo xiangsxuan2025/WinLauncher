@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System.Diagnostics;
+using System.Security.Principal;
 using System.Windows;
 
 namespace WinLauncher
@@ -9,21 +11,80 @@ namespace WinLauncher
         private IHost _host;
 
         /// <summary>
-        /// 应用程序启动时调用，配置依赖注入并创建主窗口
+        /// 检查是否以管理员权限运行
         /// </summary>
+        private bool IsRunningAsAdministrator()
+        {
+            try
+            {
+                WindowsIdentity identity = WindowsIdentity.GetCurrent();
+                WindowsPrincipal principal = new WindowsPrincipal(identity);
+                return principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 以管理员权限重新启动应用
+        /// </summary>
+        private void RestartAsAdministrator()
+        {
+            try
+            {
+                ProcessStartInfo startInfo = new ProcessStartInfo
+                {
+                    UseShellExecute = true,
+                    WorkingDirectory = Environment.CurrentDirectory,
+                    FileName = Process.GetCurrentProcess().MainModule.FileName,
+                    Verb = "runas" // 请求管理员权限
+                };
+
+                Process.Start(startInfo);
+                Current.Shutdown();
+            }
+            catch (Exception ex)
+            {
+                // 用户可能拒绝了UAC提示
+                System.Diagnostics.Debug.WriteLine($"请求管理员权限失败: {ex.Message}");
+                MessageBox.Show("需要管理员权限来扫描所有应用程序。应用将继续运行，但可能无法显示所有应用的图标。",
+                    "权限提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
         protected override async void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
 
-            // 配置依赖注入容器
-            var services = new ServiceCollection();
-            ConfigureServices(services);
-            ServiceProvider = services.BuildServiceProvider();
+            // 检查管理员权限，如果不是管理员则尝试重启
+            if (!IsRunningAsAdministrator())
+            {
+                System.Diagnostics.Debug.WriteLine("当前不是管理员权限运行，尝试请求管理员权限...");
+                RestartAsAdministrator();
+                return; // 等待重启，当前实例退出
+            }
 
-            // 创建并显示主窗口
-            var mainWindow = new MainWindow();
-            mainWindow.DataContext = ServiceProvider.GetService<MainViewModel>();
-            mainWindow.Show();
+            System.Diagnostics.Debug.WriteLine("以管理员权限运行，开始初始化应用...");
+
+            try
+            {
+                // 配置依赖注入
+                var services = new ServiceCollection();
+                ConfigureServices(services);
+                ServiceProvider = services.BuildServiceProvider();
+
+                // 创建并显示主窗口
+                var mainWindow = new MainWindow();
+                mainWindow.DataContext = ServiceProvider.GetService<MainViewModel>();
+                mainWindow.Show();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"应用启动失败: {ex.Message}");
+                MessageBox.Show($"应用启动失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         /// <summary>

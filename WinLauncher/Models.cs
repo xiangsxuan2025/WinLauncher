@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Media.Imaging;
 
@@ -11,14 +12,68 @@ namespace WinLauncher.Models
     /// </summary>
     public class AppInfo : INotifyPropertyChanged
     {
-        public string Id { get; set; } // 唯一标识符（通常为可执行文件路径）
-        public string Name { get; set; } // 应用名称
-        public string DisplayName { get; set; } // 显示名称
-        public string ExecutablePath { get; set; } // 可执行文件路径
-        public BitmapImage Icon { get; set; } // 应用图标
-        public bool IsSystemApp { get; set; } // 是否为系统应用
+        private string _id;
+        private string _name;
+        private string _displayName;
+        private string _executablePath;
+        private BitmapImage _icon;
+        private bool _isSystemApp;
+
+        public string Id
+        {
+            get => _id;
+            set { _id = value; OnPropertyChanged(); }
+        }
+
+        public string Name
+        {
+            get => _name;
+            set { _name = value; OnPropertyChanged(); }
+        }
+
+        public string DisplayName
+        {
+            get => _displayName;
+            set { _displayName = value; OnPropertyChanged(); }
+        }
+
+        public string ExecutablePath
+        {
+            get => _executablePath;
+            set { _executablePath = value; OnPropertyChanged(); }
+        }
+
+        public BitmapImage Icon
+        {
+            get => _icon;
+            set
+            {
+                _icon = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsSystemApp
+        {
+            get => _isSystemApp;
+            set { _isSystemApp = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>
+        /// 安全地更新图标属性（从外部调用）
+        /// </summary>
+        public void UpdateIcon(BitmapImage newIcon)
+        {
+            _icon = newIcon;
+            OnPropertyChanged(nameof(Icon));
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
+
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 
     /// <summary>
@@ -46,6 +101,7 @@ namespace WinLauncher.Models
         private AppInfo _app;
         private FolderInfo _folder;
         private string _emptyToken;
+        private string _customDisplayName;
         private MissingAppPlaceholder _missingApp;
 
         /// <summary>
@@ -58,8 +114,8 @@ namespace WinLauncher.Models
             {
                 _type = value;
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(DisplayName)); // 类型改变时更新显示名称
-                OnPropertyChanged(nameof(Icon)); // 类型改变时更新图标
+                OnPropertyChanged(nameof(DisplayName));
+                OnPropertyChanged(nameof(Icon));
             }
         }
 
@@ -123,9 +179,19 @@ namespace WinLauncher.Models
         }
 
         /// <summary>
-        /// 项目唯一标识符
-        /// 根据类型生成不同的标识符
+        /// 自定义显示名称（主要用于 Empty 类型）
         /// </summary>
+        public string CustomDisplayName
+        {
+            get => _customDisplayName;
+            set
+            {
+                _customDisplayName = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(DisplayName));
+            }
+        }
+
         public string Id
         {
             get
@@ -149,6 +215,10 @@ namespace WinLauncher.Models
         {
             get
             {
+                // 如果设置了自定义显示名称，优先使用它
+                if (!string.IsNullOrEmpty(_customDisplayName))
+                    return _customDisplayName;
+
                 return Type switch
                 {
                     ItemType.App => App?.DisplayName ?? "未知应用",
@@ -179,13 +249,10 @@ namespace WinLauncher.Models
             }
         }
 
-        // 方便方法：若为 .app 返回 AppInfo，否则为 null
         public AppInfo AppInfoIfApp => Type == ItemType.App ? App : null;
-
-        // 方便方法：若为 .folder 返回 FolderInfo，否则为 null
         public FolderInfo FolderInfoIfFolder => Type == ItemType.Folder ? Folder : null;
 
-        // 静态创建方法，更安全
+        // 静态创建方法，添加对自定义显示名称的支持
         public static LaunchpadItem CreateAppItem(AppInfo app)
         {
             return new LaunchpadItem { Type = ItemType.App, App = app };
@@ -196,22 +263,61 @@ namespace WinLauncher.Models
             return new LaunchpadItem { Type = ItemType.Folder, Folder = folder };
         }
 
-        public static LaunchpadItem CreateEmptyItem(string token = "")
+        public static LaunchpadItem CreateEmptyItem(string token = "", string customDisplayName = "")
         {
-            return new LaunchpadItem { Type = ItemType.Empty, EmptyToken = token };
+            return new LaunchpadItem
+            {
+                Type = ItemType.Empty,
+                EmptyToken = token,
+                CustomDisplayName = customDisplayName
+            };
         }
 
         /// <summary>
-        /// 创建透明图标（用于空位）
+        /// 创建带有自定义消息的空项目
+        /// </summary>
+        public static LaunchpadItem CreateMessageItem(string message)
+        {
+            return new LaunchpadItem
+            {
+                Type = ItemType.Empty,
+                CustomDisplayName = message
+            };
+        }
+
+        /// <summary>
+        /// 创建透明图标
         /// </summary>
         private BitmapImage CreateTransparentIcon()
         {
-            // 创建透明图标
-            var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.EndInit();
-            bitmap.Freeze();
-            return bitmap;
+            try
+            {
+                // 创建 1x1 透明 PNG
+                byte[] transparentPng = new byte[] {
+                0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+                0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+                0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
+                0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+                0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+                0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82
+            };
+
+                using (var stream = new MemoryStream(transparentPng))
+                {
+                    var bitmapImage = new BitmapImage();
+                    bitmapImage.BeginInit();
+                    bitmapImage.StreamSource = stream;
+                    bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmapImage.EndInit();
+                    bitmapImage.Freeze();
+                    return bitmapImage;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"创建透明图标失败: {ex.Message}");
+                return CreateDefaultIcon();
+            }
         }
 
         /// <summary>
@@ -219,12 +325,49 @@ namespace WinLauncher.Models
         /// </summary>
         private BitmapImage CreateDefaultIcon()
         {
-            // 创建默认图标
-            var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.EndInit();
-            bitmap.Freeze();
-            return bitmap;
+            try
+            {
+                // 创建简单的默认图标
+                var bitmap = new System.Drawing.Bitmap(64, 64);
+                using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
+                {
+                    graphics.Clear(System.Drawing.Color.LightGray);
+                }
+
+                using (var stream = new MemoryStream())
+                {
+                    bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                    stream.Position = 0;
+
+                    var bitmapImage = new BitmapImage();
+                    bitmapImage.BeginInit();
+                    bitmapImage.StreamSource = stream;
+                    bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmapImage.EndInit();
+                    bitmapImage.Freeze();
+                    return bitmapImage;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"创建默认图标失败: {ex.Message}");
+
+                // 最后的回退
+                try
+                {
+                    var bitmapImage = new BitmapImage();
+                    bitmapImage.BeginInit();
+                    // 使用内置的小图标数据
+                    bitmapImage.StreamSource = new MemoryStream(new byte[] { 0x00 });
+                    bitmapImage.EndInit();
+                    bitmapImage.Freeze();
+                    return bitmapImage;
+                }
+                catch
+                {
+                    return null;
+                }
+            }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

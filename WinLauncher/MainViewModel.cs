@@ -116,7 +116,6 @@ namespace WinLauncher
             MessageBox.Show("设置功能开发中...", "设置", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
-        // ViewModels/MainViewModel.cs (更新部分)
         private async void LoadData()
         {
             try
@@ -124,28 +123,33 @@ namespace WinLauncher
                 // 显示加载状态
                 IsLoading = true;
 
+                // 先显示加载状态 - 使用新的创建方法
+                Items.Clear();
+                Items.Add(LaunchpadItem.CreateMessageItem("正在扫描应用..."));
+
                 var apps = await _appScanner.ScanInstalledAppsAsync();
 
                 // 清除现有项目
                 Items.Clear();
 
-                // 将应用转换为 LaunchpadItem
-                foreach (var app in apps)
+                if (apps.Any())
                 {
-                    Items.Add(new LaunchpadItem
-                    {
-                        Type = ItemType.App,
-                        App = app
-                    });
-                }
+                    System.Diagnostics.Debug.WriteLine($"成功扫描到 {apps.Count} 个应用");
 
-                // 如果没有扫描到任何应用，显示提示
-                if (!apps.Any())
-                {
-                    Items.Add(new LaunchpadItem
+                    // 将应用转换为 LaunchpadItem
+                    foreach (var app in apps)
                     {
-                        Type = ItemType.Empty,
-                    });
+                        var item = LaunchpadItem.CreateAppItem(app);
+                        Items.Add(item);
+
+                        // 调试信息
+                        System.Diagnostics.Debug.WriteLine($"添加应用: {app.DisplayName}, 图标: {(app.Icon != null ? "已加载" : "未加载")}");
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("没有扫描到任何应用");
+                    Items.Add(LaunchpadItem.CreateMessageItem("未找到应用"));
                 }
 
                 // 加载保存的布局
@@ -169,13 +173,8 @@ namespace WinLauncher
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"加载数据时出错: {ex.Message}");
-
-                // 显示错误信息
                 Items.Clear();
-                Items.Add(new LaunchpadItem
-                {
-                    Type = ItemType.Empty,
-                });
+                Items.Add(LaunchpadItem.CreateMessageItem($"加载失败: {ex.Message}"));
             }
             finally
             {

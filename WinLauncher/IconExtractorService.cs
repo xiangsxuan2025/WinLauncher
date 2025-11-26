@@ -1,5 +1,4 @@
 using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows.Media.Imaging;
@@ -48,6 +47,7 @@ namespace WinLauncher
 
         // Windows API 常量
         private const uint SHGFI_ICON = 0x100; // 获取图标
+
         private const uint SHGFI_LARGEICON = 0x0; // 大图标
         private const uint SHGFI_SMALLICON = 0x1; // 小图标
 
@@ -61,29 +61,64 @@ namespace WinLauncher
             {
                 try
                 {
-                    if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+                    if (string.IsNullOrEmpty(filePath))
                     {
-                        System.Diagnostics.Debug.WriteLine($"文件不存在: {filePath}");
-                        return CreateDefaultIcon(); // 返回默认图标
+                        System.Diagnostics.Debug.WriteLine("文件路径为空");
+                        return CreateDefaultIcon();
                     }
 
-                    // 方法1: 使用 ExtractAssociatedIcon (最可靠)
-                    var iconFromExtract = ExtractIconUsingAPI(filePath);
-                    if (iconFromExtract != null)
-                        return iconFromExtract;
+                    if (!File.Exists(filePath))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"文件不存在: {filePath}");
+                        return CreateDefaultIcon();
+                    }
 
-                    // 方法2: 使用 SHGetFileInfo (备用方法)
-                    var iconFromShell = ExtractIconUsingShell(filePath);
-                    if (iconFromShell != null)
-                        return iconFromShell;
+                    // 添加文件访问权限检查
+                    try
+                    {
+                        using (var fileStream = File.OpenRead(filePath))
+                        {
+                            // 如果能打开文件，说明有读取权限
+                        }
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"没有文件访问权限: {filePath}");
+                        return CreateDefaultIcon();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"检查文件权限时出错 {filePath}: {ex.Message}");
+                    }
 
-                    // 方法3: 使用 System.Drawing.Icon (最后备选)
+                    System.Diagnostics.Debug.WriteLine($"开始提取图标: {filePath}");
+
+                    // 方法1: 使用 System.Drawing.Icon (最可靠的方法)
                     var iconFromDrawing = ExtractIconUsingDrawing(filePath);
                     if (iconFromDrawing != null)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"使用方法1成功提取图标: {filePath}");
                         return iconFromDrawing;
+                    }
+
+                    // 方法2: 使用 ExtractAssociatedIcon API
+                    var iconFromExtract = ExtractIconUsingAPI(filePath);
+                    if (iconFromExtract != null)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"使用方法2成功提取图标: {filePath}");
+                        return iconFromExtract;
+                    }
+
+                    // 方法3: 使用 SHGetFileInfo API
+                    var iconFromShell = ExtractIconUsingShell(filePath);
+                    if (iconFromShell != null)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"使用方法3成功提取图标: {filePath}");
+                        return iconFromShell;
+                    }
 
                     System.Diagnostics.Debug.WriteLine($"所有图标提取方法都失败了: {filePath}");
-                    return CreateDefaultIcon(); // 所有方法都失败时返回默认图标
+                    return CreateDefaultIcon();
                 }
                 catch (Exception ex)
                 {
@@ -94,6 +129,41 @@ namespace WinLauncher
         }
 
         /// <summary>
+        /// 使用 System.Drawing.Icon 提取图标 - 最可靠的方法
+        /// </summary>
+        private BitmapImage ExtractIconUsingDrawing(string filePath)
+        {
+            try
+            {
+                System.Diagnostics.Debug.WriteLine($"尝试使用 System.Drawing.Icon 提取图标: {filePath}");
+
+                // 使用 System.Drawing.Icon.ExtractAssociatedIcon
+                var icon = Icon.ExtractAssociatedIcon(filePath);
+                if (icon != null)
+                {
+                    using (icon)
+                    {
+                        var bitmapImage = ConvertIconToBitmapImage(icon);
+                        if (bitmapImage != null)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"System.Drawing.Icon 提取成功: {filePath}");
+                            return bitmapImage;
+                        }
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"Icon.ExtractAssociatedIcon 返回 null: {filePath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Icon.ExtractAssociatedIcon 失败 {filePath}: {ex.Message}");
+            }
+            return null;
+        }
+
+        /// <summary>
         /// 使用 ExtractAssociatedIcon API 提取图标
         /// </summary>
         private BitmapImage ExtractIconUsingAPI(string filePath)
@@ -101,14 +171,24 @@ namespace WinLauncher
             IntPtr hIcon = IntPtr.Zero;
             try
             {
-                // 使用 ExtractAssociatedIcon API
+                System.Diagnostics.Debug.WriteLine($"尝试使用 ExtractAssociatedIcon API 提取图标: {filePath}");
+
                 hIcon = ExtractAssociatedIcon(IntPtr.Zero, filePath, out _);
                 if (hIcon != IntPtr.Zero)
                 {
                     using (var icon = Icon.FromHandle(hIcon))
                     {
-                        return ConvertIconToBitmapImage(icon);
+                        var bitmapImage = ConvertIconToBitmapImage(icon);
+                        if (bitmapImage != null)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"ExtractAssociatedIcon API 提取成功: {filePath}");
+                            return bitmapImage;
+                        }
                     }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"ExtractAssociatedIcon 返回空句柄: {filePath}");
                 }
             }
             catch (Exception ex)
@@ -131,14 +211,25 @@ namespace WinLauncher
             SHFILEINFO shFileInfo = new SHFILEINFO();
             try
             {
+                System.Diagnostics.Debug.WriteLine($"尝试使用 SHGetFileInfo API 提取图标: {filePath}");
+
                 IntPtr hIcon = SHGetFileInfo(filePath, 0, ref shFileInfo, (uint)Marshal.SizeOf(shFileInfo), SHGFI_ICON | SHGFI_LARGEICON);
 
                 if (shFileInfo.hIcon != IntPtr.Zero)
                 {
                     using (var icon = Icon.FromHandle(shFileInfo.hIcon))
                     {
-                        return ConvertIconToBitmapImage(icon);
+                        var bitmapImage = ConvertIconToBitmapImage(icon);
+                        if (bitmapImage != null)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"SHGetFileInfo API 提取成功: {filePath}");
+                            return bitmapImage;
+                        }
                     }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"SHGetFileInfo 返回空句柄: {filePath}");
                 }
             }
             catch (Exception ex)
@@ -148,37 +239,13 @@ namespace WinLauncher
             finally
             {
                 if (shFileInfo.hIcon != IntPtr.Zero)
-                    DestroyIcon(shFileInfo.hIcon); // 清理资源
+                    DestroyIcon(shFileInfo.hIcon);
             }
             return null;
         }
 
         /// <summary>
-        /// 使用 System.Drawing.Icon 提取图标
-        /// </summary>
-        private BitmapImage ExtractIconUsingDrawing(string filePath)
-        {
-            try
-            {
-                // 使用 System.Drawing.Icon.ExtractAssociatedIcon
-                var icon = Icon.ExtractAssociatedIcon(filePath);
-                if (icon != null)
-                {
-                    using (icon)
-                    {
-                        return ConvertIconToBitmapImage(icon);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Icon.ExtractAssociatedIcon 失败: {ex.Message}");
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// 将 System.Drawing.Icon 转换为 WPF 的 BitmapImage
+        /// 将 System.Drawing.Icon 转换为 WPF 的 BitmapImage - 修复版本
         /// </summary>
         private BitmapImage ConvertIconToBitmapImage(Icon icon)
         {
@@ -186,21 +253,23 @@ namespace WinLauncher
             {
                 using (var bitmap = icon.ToBitmap())
                 {
-                    var stream = new MemoryStream();
+                    using (var stream = new MemoryStream())
+                    {
+                        // 使用 PNG 格式保存
+                        bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                        stream.Position = 0;
 
-                    // 使用 PNG 格式以获得更好的质量
-                    bitmap.Save(stream, ImageFormat.Png);
-                    stream.Position = 0;
+                        var bitmapImage = new BitmapImage();
+                        bitmapImage.BeginInit();
+                        bitmapImage.StreamSource = stream;
+                        bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+                        bitmapImage.CreateOptions = BitmapCreateOptions.None; // 修改这里
+                        bitmapImage.EndInit();
+                        bitmapImage.Freeze(); // 冻结对象以便跨线程使用
 
-                    var bitmapImage = new BitmapImage();
-                    bitmapImage.BeginInit();
-                    bitmapImage.StreamSource = stream;
-                    bitmapImage.CacheOption = BitmapCacheOption.OnLoad; // 立即加载
-                    bitmapImage.CreateOptions = BitmapCreateOptions.IgnoreImageCache; // 忽略缓存
-                    bitmapImage.EndInit();
-                    bitmapImage.Freeze(); // 冻结对象，使其可以在其他线程使用
-
-                    return bitmapImage;
+                        System.Diagnostics.Debug.WriteLine("图标转换成功");
+                        return bitmapImage;
+                    }
                 }
             }
             catch (Exception ex)
@@ -218,56 +287,63 @@ namespace WinLauncher
         {
             try
             {
-                // 创建一个美观的默认应用图标
+                System.Diagnostics.Debug.WriteLine("创建默认图标");
+
+                // 创建一个简单的默认图标
                 var bitmap = new System.Drawing.Bitmap(64, 64);
                 using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
                 {
                     graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                    graphics.Clear(System.Drawing.Color.FromArgb(240, 240, 240));
+                    graphics.Clear(System.Drawing.Color.LightGray);
 
-                    // 绘制圆角矩形背景
-                    var backgroundBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(200, 200, 200));
-                    var backgroundRect = new System.Drawing.Rectangle(4, 4, 56, 56);
-                    graphics.FillRoundedRectangle(backgroundBrush, backgroundRect, 12);
+                    // 绘制一个简单的应用图标
+                    var rect = new System.Drawing.Rectangle(8, 8, 48, 48);
+                    graphics.FillRectangle(System.Drawing.Brushes.White, rect);
+                    graphics.DrawRectangle(System.Drawing.Pens.Gray, rect);
 
-                    // 绘制应用图标轮廓
-                    var outlinePen = new System.Drawing.Pen(System.Drawing.Color.FromArgb(120, 120, 120), 2);
-                    graphics.DrawRoundedRectangle(outlinePen, backgroundRect, 12);
-
-                    // 绘制"A"字母
-                    using (var font = new System.Drawing.Font("Arial", 20, System.Drawing.FontStyle.Bold))
-                    using (var textBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(80, 80, 80)))
+                    using (var font = new System.Drawing.Font("Arial", 16, System.Drawing.FontStyle.Bold))
                     {
-                        var textSize = graphics.MeasureString("A", font);
-                        graphics.DrawString("A", font, textBrush,
+                        var text = "App";
+                        var textSize = graphics.MeasureString(text, font);
+                        graphics.DrawString(text, font, System.Drawing.Brushes.Black,
                             (64 - textSize.Width) / 2,
                             (64 - textSize.Height) / 2);
                     }
                 }
 
-                var stream = new MemoryStream();
-                bitmap.Save(stream, ImageFormat.Png);
-                stream.Position = 0;
+                using (var stream = new MemoryStream())
+                {
+                    bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                    stream.Position = 0;
 
-                var image = new BitmapImage();
-                image.BeginInit();
-                image.StreamSource = stream;
-                image.CacheOption = BitmapCacheOption.OnLoad;
-                image.EndInit();
-                image.Freeze();
+                    var bitmapImage = new BitmapImage();
+                    bitmapImage.BeginInit();
+                    bitmapImage.StreamSource = stream;
+                    bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmapImage.EndInit();
+                    bitmapImage.Freeze();
 
-                return image;
+                    System.Diagnostics.Debug.WriteLine("默认图标创建成功");
+                    return bitmapImage;
+                }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"创建默认图标失败: {ex.Message}");
 
                 // 最后的回退：创建空的位图
-                var emptyBitmap = new BitmapImage();
-                emptyBitmap.BeginInit();
-                emptyBitmap.EndInit();
-                emptyBitmap.Freeze();
-                return emptyBitmap;
+                try
+                {
+                    var emptyBitmap = new BitmapImage();
+                    emptyBitmap.BeginInit();
+                    emptyBitmap.EndInit();
+                    emptyBitmap.Freeze();
+                    return emptyBitmap;
+                }
+                catch
+                {
+                    return null;
+                }
             }
         }
     }

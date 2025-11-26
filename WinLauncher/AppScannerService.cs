@@ -1,6 +1,7 @@
 using System.IO;
 using System.Linq;
 using System.Security;
+using System.Windows;
 using System.Windows.Media.Imaging;
 using WinLauncher.Models;
 
@@ -427,33 +428,6 @@ namespace WinLauncher
         }
 
         /// <summary>
-        /// 从可执行文件创建应用信息
-        /// </summary>
-        private async Task<AppInfo> CreateAppInfoFromExecutable(string exePath)
-        {
-            try
-            {
-                var fileName = Path.GetFileNameWithoutExtension(exePath);
-                var icon = await GetAppIconAsync(exePath);
-
-                return new AppInfo
-                {
-                    Id = exePath,
-                    Name = fileName,
-                    DisplayName = fileName,
-                    ExecutablePath = exePath,
-                    Icon = icon
-                };
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"处理可执行文件失败 {exePath}: {ex.Message}");
-            }
-
-            return null;
-        }
-
-        /// <summary>
         /// 获取应用的图标
         /// </summary>
         public async Task<BitmapImage> GetAppIconAsync(string executablePath)
@@ -499,6 +473,122 @@ namespace WinLauncher
             {
                 System.Diagnostics.Debug.WriteLine($"解析快捷方式目标失败 {lnkPath}: {ex.Message}");
                 return lnkPath;
+            }
+        }// 在 WindowsAppScannerService 类中添加更好的图标处理
+
+        private async Task<AppInfo> CreateAppInfoFromExecutable(string exePath)
+        {
+            try
+            {
+                var fileName = Path.GetFileNameWithoutExtension(exePath);
+
+                // 先创建基本的 AppInfo，设置一个临时的加载图标
+                var appInfo = new AppInfo
+                {
+                    Id = exePath,
+                    Name = fileName,
+                    DisplayName = fileName,
+                    ExecutablePath = exePath
+                };
+
+                // 先设置一个加载图标
+                var loadingIcon = CreateLoadingIcon();
+                if (loadingIcon != null)
+                {
+                    appInfo.Icon = loadingIcon;
+                }
+
+                // 异步加载真实图标
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var icon = await GetAppIconAsync(exePath);
+                        if (icon != null)
+                        {
+                            // 在 UI 线程更新图标
+                            await Application.Current.Dispatcher.InvokeAsync(() =>
+                            {
+                                appInfo.UpdateIcon(icon); // 使用新的方法来更新图标
+                            });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"异步加载图标失败 {exePath}: {ex.Message}");
+                    }
+                });
+
+                return appInfo;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"处理可执行文件失败 {exePath}: {ex.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 创建加载中的占位图标
+        /// </summary>
+        private BitmapImage CreateLoadingIcon()
+        {
+            try
+            {
+                var bitmap = new System.Drawing.Bitmap(64, 64);
+                using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
+                using (var stream = new MemoryStream())
+                {
+                    graphics.Clear(System.Drawing.Color.LightGray);
+
+                    // 绘制加载文本
+                    using (var font = new System.Drawing.Font("Arial", 8))
+                    using (var brush = new System.Drawing.SolidBrush(System.Drawing.Color.Black))
+                    {
+                        var text = "Loading...";
+                        var textSize = graphics.MeasureString(text, font);
+                        graphics.DrawString(text, font, brush,
+                            (64 - textSize.Width) / 2,
+                            (64 - textSize.Height) / 2);
+                    }
+
+                    bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                    stream.Position = 0;
+
+                    var bitmapImage = new BitmapImage();
+                    bitmapImage.BeginInit();
+                    bitmapImage.StreamSource = stream;
+                    bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmapImage.EndInit();
+                    bitmapImage.Freeze();
+                    return bitmapImage;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"创建加载图标失败: {ex.Message}");
+
+                // 回退方案 - 创建简单的灰色图标
+                try
+                {
+                    var fallback = new BitmapImage();
+                    fallback.BeginInit();
+                    // 创建一个简单的 1x1 灰色图像
+                    byte[] grayPixel = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+                0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00,
+                0x90, 0x77, 0x53, 0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, 0x08, 0x99, 0x63, 0xF8, 0xCF,
+                0xC0, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82 };
+                    fallback.StreamSource = new MemoryStream(grayPixel);
+                    fallback.CacheOption = BitmapCacheOption.OnLoad;
+                    fallback.EndInit();
+                    fallback.Freeze();
+                    return fallback;
+                }
+                catch
+                {
+                    return null;
+                }
             }
         }
     }
