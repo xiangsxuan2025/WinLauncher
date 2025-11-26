@@ -12,7 +12,5 @@ namespace WinLauncher.Core.Interfaces
         /// 异步扫描系统中已安装的应用
         /// </summary>
         Task<List<AppInfo>> ScanInstalledAppsAsync();
-
-        Task<List<AppInfo>> ScanStoreAppsAsync();
     }
 }
