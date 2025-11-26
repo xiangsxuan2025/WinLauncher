@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Security.Principal;
 using System.Windows;
+using WinLauncher.Core.Interfaces;
 
 namespace WinLauncher
 {
