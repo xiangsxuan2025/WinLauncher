@@ -7,24 +7,22 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using WinLauncher.Models;
 
 namespace WinLauncher
 {
-    // ViewModels/MainViewModel.cs// ViewModels/MainViewModel.cs
-    using System.Collections.ObjectModel;
-    using System.ComponentModel;
-    using System.Runtime.CompilerServices;
-    using System.Windows;
-    using System.Windows.Input;
-
     public class MainViewModel : INotifyPropertyChanged
     {
         private readonly IAppScannerService _appScanner;
         private readonly IDataService _dataService;
+        private readonly DispatcherTimer _searchTimer;
+        private List<LaunchpadItem> _allItems = new List<LaunchpadItem>();
 
         public ObservableCollection<LaunchpadItem> Items { get; set; }
+        public ObservableCollection<LaunchpadItem> SkeletonItems { get; set; }
         public ObservableCollection<FolderInfo> Folders { get; set; }
 
         private string _searchText;
@@ -35,8 +33,11 @@ namespace WinLauncher
             set
             {
                 _searchText = value;
-                FilterItems();
                 OnPropertyChanged();
+
+                // 搜索防抖
+                _searchTimer.Stop();
+                _searchTimer.Start();
             }
         }
 
@@ -48,72 +49,64 @@ namespace WinLauncher
             set { _currentPage = value; OnPropertyChanged(); }
         }
 
+        private bool _isLoading;
+
+        public bool IsLoading
+        {
+            get => _isLoading;
+            set
+            {
+                _isLoading = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ShowLoadingIndicator));
+            }
+        }
+
+        public bool ShowLoadingIndicator => IsLoading;
+
         public ICommand LaunchAppCommand { get; }
         public ICommand OpenFolderCommand { get; }
         public ICommand SearchCommand { get; }
-
-        // ViewModels/MainViewModel.cs (新增命令)
         public ICommand ClearSearchCommand { get; }
-
         public ICommand OpenSettingsCommand { get; }
-
-        public ICommand ItemClickCommand { get; } // 新增：统一的项目点击命令
+        public ICommand ItemClickCommand { get; }
 
         public MainViewModel(IAppScannerService appScanner, IDataService dataService)
         {
             _appScanner = appScanner;
             _dataService = dataService;
+            // 搜索防抖定时器
+            _searchTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+            _searchTimer.Tick += (s, e) =>
+            {
+                _searchTimer.Stop();
+                ExecuteSearch();
+            };
 
             Items = new ObservableCollection<LaunchpadItem>();
+            SkeletonItems = new ObservableCollection<LaunchpadItem>();
             Folders = new ObservableCollection<FolderInfo>();
 
-            // 修正：正确初始化命令
+            // 初始化骨架屏项目
+            InitializeSkeletonItems();
+
+            // 命令初始化
             LaunchAppCommand = new RelayCommand<AppInfo>(LaunchApp);
             OpenFolderCommand = new RelayCommand<FolderInfo>(OpenFolder);
             SearchCommand = new RelayCommand(ExecuteSearch);
-            ItemClickCommand = new RelayCommand<LaunchpadItem>(OnItemClicked); // 新增
-            // 在构造函数中添加
+            ItemClickCommand = new RelayCommand<LaunchpadItem>(OnItemClicked);
             ClearSearchCommand = new RelayCommand(ClearSearch);
             OpenSettingsCommand = new RelayCommand(OpenSettings);
 
             LoadData();
         }
 
-        // 新增：统一处理项目点击
-        private void OnItemClicked(LaunchpadItem item)
+        private void InitializeSkeletonItems()
         {
-            if (item == null) return;
-
-            switch (item.Type)
+            for (int i = 0; i < 20; i++)
             {
-                case ItemType.App:
-                    LaunchApp(item.App);
-                    break;
-
-                case ItemType.Folder:
-                    OpenFolder(item.Folder);
-                    break;
-
-                case ItemType.Empty:
-                    // 空槽位，不执行任何操作
-                    break;
-
-                case ItemType.MissingApp:
-                    // 缺失的应用，可以显示提示信息
-                    System.Diagnostics.Debug.WriteLine($"应用已丢失: {item.DisplayName}");
-                    break;
+                SkeletonItems.Add(LaunchpadItem.CreateEmptyItem($"skeleton_{i}"));
             }
-        }
-
-        private void ClearSearch()
-        {
-            SearchText = string.Empty;
-        }
-
-        private void OpenSettings()
-        {
-            // 打开设置窗口
-            MessageBox.Show("设置功能开发中...", "设置", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private async void LoadData()
@@ -121,42 +114,26 @@ namespace WinLauncher
             try
             {
                 IsLoading = true;
-
-                // 先显示加载状态
                 Items.Clear();
-                Items.Add(LaunchpadItem.CreateMessageItem("正在扫描应用..."));
 
                 System.Diagnostics.Debug.WriteLine("=== 开始扫描所有应用 ===");
 
                 var apps = await _appScanner.ScanInstalledAppsAsync();
-
-                // 清除现有项目
-                Items.Clear();
+                _allItems.Clear();
 
                 if (apps.Any())
                 {
                     System.Diagnostics.Debug.WriteLine($"=== 扫描完成，共找到 {apps.Count} 个应用 ===");
 
-                    // 统计不同类型应用的数量
-                    var traditionalApps = apps.Count(a => !a.Id.StartsWith("UWP_") && !a.Id.StartsWith("Store_"));
-                    var uwpApps = apps.Count(a => a.Id.StartsWith("UWP_"));
-                    var storeApps = apps.Count(a => a.Id.StartsWith("Store_"));
-
-                    System.Diagnostics.Debug.WriteLine($"传统桌面应用: {traditionalApps} 个");
-                    System.Diagnostics.Debug.WriteLine($"UWP 应用: {uwpApps} 个");
-                    System.Diagnostics.Debug.WriteLine($"应用商店应用: {storeApps} 个");
-
                     // 将应用转换为 LaunchpadItem
                     foreach (var app in apps)
                     {
                         var item = LaunchpadItem.CreateAppItem(app);
-                        Items.Add(item);
-
-                        // 调试信息
-                        var appType = app.Id.StartsWith("UWP_") ? "UWP" :
-                                     app.Id.StartsWith("Store_") ? "Store" : "Desktop";
-                        System.Diagnostics.Debug.WriteLine($"{appType}应用: {app.DisplayName}, 路径: {app.ExecutablePath}");
+                        _allItems.Add(item);
                     }
+
+                    // 初始显示所有项目
+                    UpdateItemsCollection(_allItems);
                 }
                 else
                 {
@@ -193,67 +170,144 @@ namespace WinLauncher
             }
         }
 
-        private bool _isLoading;
-
-        public bool IsLoading
+        private void ExecuteSearch()
         {
-            get => _isLoading;
-            set
+            if (string.IsNullOrWhiteSpace(SearchText))
             {
-                _isLoading = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(ShowLoadingIndicator));
+                UpdateItemsCollection(_allItems);
+            }
+            else
+            {
+                FilterItems();
             }
         }
 
-        public bool ShowLoadingIndicator => IsLoading;
-
-        private void MergeLayoutWithScannedApps(List<LaunchpadItem> savedItems, List<AppInfo> scannedApps)
+        /// <summary>
+        /// 智能搜索过滤
+        /// </summary>
+        private void FilterItems()
         {
-            // 实现布局合并逻辑
-            // 这里可以确保保存的布局项与扫描到的应用匹配
+            var searchTerms = SearchText.ToLower().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var filteredItems = new List<LaunchpadItem>();
+
+            foreach (var item in _allItems)
+            {
+                var score = CalculateSearchScore(item, searchTerms);
+                if (score > 0.3) // 阈值可调整
+                {
+                    filteredItems.Add(item);
+                }
+            }
+
+            // 按搜索分数排序
+            var sortedItems = filteredItems
+                .OrderByDescending(item => CalculateSearchScore(item, searchTerms))
+                .ThenBy(item => item.DisplayName);
+
+            UpdateItemsCollection(sortedItems);
+        }
+
+        /// <summary>
+        /// 计算搜索分数
+        /// </summary>
+        private double CalculateSearchScore(LaunchpadItem item, string[] searchTerms)
+        {
+            if (item.Type != ItemType.App) return 0;
+
+            var displayName = item.DisplayName?.ToLower() ?? "";
+            double score = 0;
+
+            foreach (var term in searchTerms)
+            {
+                if (displayName.Contains(term))
+                {
+                    // 完全匹配得分更高
+                    if (displayName == term)
+                        score += 1.0;
+                    // 开头匹配得分较高
+                    else if (displayName.StartsWith(term))
+                        score += 0.8;
+                    // 包含匹配得分一般
+                    else
+                        score += 0.5;
+                }
+            }
+
+            return score / searchTerms.Length;
+        }
+
+        private void UpdateItemsCollection(IEnumerable<LaunchpadItem> items)
+        {
+            Items.Clear();
+            foreach (var item in items)
+            {
+                Items.Add(item);
+            }
+        }
+
+        private void ClearSearch()
+        {
+            SearchText = string.Empty;
+            UpdateItemsCollection(_allItems);
+        }
+
+        private void OpenSettings()
+        {
+            // 打开设置窗口
+            MessageBox.Show("设置功能开发中...", "设置", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void OnItemClicked(LaunchpadItem item)
+        {
+            if (item == null) return;
+
+            switch (item.Type)
+            {
+                case ItemType.App:
+                    LaunchApp(item.App);
+                    break;
+
+                case ItemType.Folder:
+                    OpenFolder(item.Folder);
+                    break;
+
+                case ItemType.Empty:
+                    break;
+
+                case ItemType.MissingApp:
+                    System.Diagnostics.Debug.WriteLine($"应用已丢失: {item.DisplayName}");
+                    break;
+            }
         }
 
         private void LaunchApp(AppInfo app)
         {
             try
             {
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = app.ExecutablePath,
                     UseShellExecute = true
                 });
+
+                stopwatch.Stop();
             }
             catch (System.Exception ex)
             {
-                // 处理启动失败
                 System.Diagnostics.Debug.WriteLine($"启动应用失败: {ex.Message}");
             }
         }
 
         private void OpenFolder(FolderInfo folder)
         {
-            // 打开文件夹逻辑
             System.Diagnostics.Debug.WriteLine($"打开文件夹: {folder.Name}");
         }
 
-        private void ExecuteSearch()
+        private void MergeLayoutWithScannedApps(List<LaunchpadItem> savedItems, List<AppInfo> scannedApps)
         {
-            // 执行搜索逻辑
-            FilterItems();
-        }
-
-        private void FilterItems()
-        {
-            // 实现搜索过滤逻辑
-            if (string.IsNullOrWhiteSpace(SearchText))
-            {
-                // 显示所有项目
-            }
-            else
-            {
-                // 根据搜索文本过滤
-            }
+            // 实现布局合并逻辑
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
