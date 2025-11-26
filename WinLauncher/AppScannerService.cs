@@ -42,50 +42,61 @@ namespace WinLauncher
         }
 
         /// <summary>
-        /// 扫描已安装的应用，并从多个来源收集应用信息
+        /// 并行扫描已安装的应用
         /// </summary>
         public async Task<List<AppInfo>> ScanInstalledAppsAsync()
         {
-            var apps = new List<AppInfo>();
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-            // 扫描传统桌面应用
-            await ScanSafeDirectories(apps);
+            try
+            {
+                var tasks = new[]
+                {
+                    Task.Run(() => ScanSafeDirectories()),
+                    Task.Run(() => ScanUwpAppsAsync()),
+                    Task.Run(() => ScanStoreAppsAsync())
+                };
 
-            // 扫描 UWP 应用
-            var uwpApps = await ScanUwpAppsAsync();
-            apps.AddRange(uwpApps);
+                var results = await Task.WhenAll(tasks);
+                var allApps = results.SelectMany(x => x).ToList();
 
-            // 扫描应用商店应用
-            var storeApps = await ScanStoreAppsAsync();
-            apps.AddRange(storeApps);
+                var distinctApps = allApps.Distinct(new AppInfoComparer()).ToList();
 
-            return apps.Distinct(new AppInfoComparer()).ToList();
+                stopwatch.Stop();
+
+                return distinctApps;
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                System.Diagnostics.Debug.WriteLine($"扫描应用失败: {ex.Message}");
+                return new List<AppInfo>();
+            }
         }
 
         /// <summary>
-        /// 扫描安全的目录来发现应用
-        /// 包括：开始菜单、桌面快捷方式、程序文件目录、注册表
+        /// 并行扫描安全目录
         /// </summary>
-        private async Task ScanSafeDirectories(List<AppInfo> apps)
+        private async Task<List<AppInfo>> ScanSafeDirectories()
         {
-            // 1. 扫描当前用户的开始菜单（通常有权限）
-            await ScanCurrentUserStartMenu(apps);
+            var tasks = new[]
+            {
+                ScanCurrentUserStartMenu(),
+                ScanDesktopShortcuts(),
+                ScanCommonProgramFiles(),
+                ScanFromRegistry()
+            };
 
-            // 2. 扫描桌面快捷方式
-            await ScanDesktopShortcuts(apps);
-
-            // 3. 扫描程序文件目录（只扫描常见应用，避免权限问题）
-            await ScanCommonProgramFiles(apps);
-
-            // 4. 使用注册表获取已安装应用信息
-            await ScanFromRegistry(apps);
+            var results = await Task.WhenAll(tasks);
+            return results.SelectMany(x => x).ToList();
         }
 
         /// <summary>
         /// 扫描当前用户的开始菜单目录
         /// </summary>
-        private async Task ScanCurrentUserStartMenu(List<AppInfo> apps)
+        private async Task<List<AppInfo>> ScanCurrentUserStartMenu()
         {
+            var apps = new List<AppInfo>();
             try
             {
                 var userStartMenu = Environment.GetFolderPath(Environment.SpecialFolder.StartMenu);
@@ -94,25 +105,19 @@ namespace WinLauncher
                     await ScanDirectoryForShortcuts(userStartMenu, apps);
                 }
             }
-            catch (SecurityException ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"安全异常 - 用户开始菜单: {ex.Message}");
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"访问被拒绝 - 用户开始菜单: {ex.Message}");
-            }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"扫描用户开始菜单时出错: {ex.Message}");
             }
+            return apps;
         }
 
         /// <summary>
         /// 扫描桌面快捷方式
         /// </summary>
-        private async Task ScanDesktopShortcuts(List<AppInfo> apps)
+        private async Task<List<AppInfo>> ScanDesktopShortcuts()
         {
+            var apps = new List<AppInfo>();
             try
             {
                 var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
@@ -125,13 +130,15 @@ namespace WinLauncher
             {
                 System.Diagnostics.Debug.WriteLine($"扫描桌面快捷方式时出错: {ex.Message}");
             }
+            return apps;
         }
 
         /// <summary>
         /// 扫描程序文件目录（Program Files）
         /// </summary>
-        private async Task ScanCommonProgramFiles(List<AppInfo> apps)
+        private async Task<List<AppInfo>> ScanCommonProgramFiles()
         {
+            var apps = new List<AppInfo>();
             var programFilesPaths = new[]
             {
                 Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
@@ -147,19 +154,12 @@ namespace WinLauncher
                         await ScanCommonApplications(programFilesPath, apps);
                     }
                 }
-                catch (SecurityException ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"安全异常 - 程序文件目录 {programFilesPath}: {ex.Message}");
-                }
-                catch (UnauthorizedAccessException ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"访问被拒绝 - 程序文件目录 {programFilesPath}: {ex.Message}");
-                }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"扫描程序文件目录 {programFilesPath} 时出错: {ex.Message}");
                 }
             }
+            return apps;
         }
 
         /// <summary>
@@ -276,11 +276,11 @@ namespace WinLauncher
         /// <summary>
         /// 从 Windows 注册表中扫描已安装的应用信息
         /// </summary>
-        private async Task ScanFromRegistry(List<AppInfo> apps)
+        private async Task<List<AppInfo>> ScanFromRegistry()
         {
+            var apps = new List<AppInfo>();
             try
             {
-                // 使用注册表获取已安装的应用信息（更安全的方式）
                 var installedApps = await GetInstalledAppsFromRegistry();
                 apps.AddRange(installedApps);
             }
@@ -288,6 +288,7 @@ namespace WinLauncher
             {
                 System.Diagnostics.Debug.WriteLine($"从注册表扫描应用时出错: {ex.Message}");
             }
+            return apps;
         }
 
         /// <summary>
